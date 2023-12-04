@@ -165,3 +165,6 @@ mapillary_token
 # tests, as always:
 tests.py
 tests
+
+# OSMNX cache:
+cache

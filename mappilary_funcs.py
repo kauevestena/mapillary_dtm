@@ -35,7 +35,7 @@ def random_point_in_bbox(input_bbox):
     lon = min_lon + (max_lon - min_lon) * np.random.random()
     return lon, lat
 
-def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=None):
+def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=None,params_dict=None):
     """
     Request images from Mapillary API given a bbox
 
@@ -50,7 +50,9 @@ def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=
         dict: A dictionary containing the response from the API.
     """
     url = "https://graph.mapillary.com/images"
-    params = {
+
+    if not params_dict:
+        params = {
         "bbox": f"{minLon},{minLat},{maxLon},{maxLat}",
         'limit': 5000,
         "access_token": token,
@@ -84,6 +86,10 @@ def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=
             # "detections",
         ])
     }
+        
+    else:
+        params = params_dict
+        
     response = requests.get(url, params=params)
 
     as_dict = response.json()

@@ -9,3 +9,6 @@ Repository meant to try one idea: to generate a DTM using mapillary's metadata
 3) Robust regression such as 3D-line ransac shall be used to filter out outliers or as an approximate way of modelling
 
 The main motivation is to enable 3D info for OSM roads (obtain a Z coordinate through DTM querying), this may enable, for example, projecting road stretches to terrestrial imagery.
+
+
+for setup, please refer to "setup.md"

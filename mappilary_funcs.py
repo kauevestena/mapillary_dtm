@@ -11,6 +11,11 @@ import wget
 from time import sleep
 import geopandas as gpd
 
+
+def get_mapillary_token():
+    with open('mapillary_token', 'r') as f:
+        return f.readline()
+
 MAPPILARY_TOKEN = get_mapillary_token()
 
 

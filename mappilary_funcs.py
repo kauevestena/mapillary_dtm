@@ -150,19 +150,23 @@ def mapillary_data_to_gdf(data,outpath=None,filtering_polygon=None):
 
     as_df = pd.DataFrame.from_records(data['data'])
 
-    as_df.geometry = as_df.geometry.apply(get_coordinates_as_point)
+    if 'geometry' in as_df.columns:
 
-    as_gdf = gpd.GeoDataFrame(as_df,crs='EPSG:4326',geometry='geometry')
+        as_df.geometry = as_df.geometry.apply(get_coordinates_as_point)
 
-    selected_columns_to_str(as_gdf)
+        as_gdf = gpd.GeoDataFrame(as_df,crs='EPSG:4326',geometry='geometry')
 
-    if filtering_polygon:
-        as_gdf = as_gdf[as_gdf.intersects(filtering_polygon)]
+        selected_columns_to_str(as_gdf)
 
-    if outpath:
-        as_gdf.to_file(outpath)
+        if filtering_polygon:
+            as_gdf = as_gdf[as_gdf.intersects(filtering_polygon)]
 
-    return as_gdf
+        if outpath:
+            as_gdf.to_file(outpath)
+
+        return as_gdf
+    else:
+        return gpd.GeoDataFrame()
 
 # # # doesn't seems to be working, some kind of weird bug...
 # # def filter_metadata_with_polygon(data, polygon,anti_rounding_factor=1000000):

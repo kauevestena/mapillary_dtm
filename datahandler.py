@@ -42,3 +42,11 @@ class data_handler:
             bbox = resort_bbox(entry.geometry.bounds)
             data_dict = get_mapillary_images_metadata(*bbox,MAPPILARY_TOKEN)
             yield mapillary_data_to_gdf(data_dict,filtering_polygon=entry.geometry)
+
+
+    def save_all_data(self,outpath):
+        self.gdf_list = [data for data in tqdm(self.mappilary_data_generator(),total=len(self))]
+
+        self.gdf = pd.concat(self.gdf_list)
+        
+        self.gdf.to_file(outpath)

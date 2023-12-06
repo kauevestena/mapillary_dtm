@@ -3,6 +3,7 @@ import json, os
 import osmnx as ox
 from shapely.geometry import Point
 import pandas as pd
+from tqdm import tqdm
 
 def dump_json(data, filename,encoding='utf-8'):
     with open(filename, 'w') as f:

@@ -79,9 +79,9 @@ def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=
             # "thumb_2048_url",
             "thumb_original_url", 
             "merge_cc", 
-            # "mesh", 
+            "mesh", 
             "sequence", 
-            # "sfm_cluster", 
+            "sfm_cluster", 
             "width",
             # "detections",
         ])
@@ -148,23 +148,26 @@ def mapillary_data_to_gdf(data,outpath=None,filtering_polygon=None):
     if isinstance(data,str):
         data = read_json(data)
 
-    as_df = pd.DataFrame.from_records(data['data'])
+    if data.get('data'):
+        as_df = pd.DataFrame.from_records(data['data'])
 
-    if 'geometry' in as_df.columns:
+        if 'geometry' in as_df.columns:
 
-        as_df.geometry = as_df.geometry.apply(get_coordinates_as_point)
+            as_df.geometry = as_df.geometry.apply(get_coordinates_as_point)
 
-        as_gdf = gpd.GeoDataFrame(as_df,crs='EPSG:4326',geometry='geometry')
+            as_gdf = gpd.GeoDataFrame(as_df,crs='EPSG:4326',geometry='geometry')
 
-        selected_columns_to_str(as_gdf)
+            selected_columns_to_str(as_gdf)
 
-        if filtering_polygon:
-            as_gdf = as_gdf[as_gdf.intersects(filtering_polygon)]
+            if filtering_polygon:
+                as_gdf = as_gdf[as_gdf.intersects(filtering_polygon)]
 
-        if outpath:
-            as_gdf.to_file(outpath)
+            if outpath:
+                as_gdf.to_file(outpath)
 
-        return as_gdf
+            return as_gdf
+        else:
+            return gpd.GeoDataFrame()
     else:
         return gpd.GeoDataFrame()
 

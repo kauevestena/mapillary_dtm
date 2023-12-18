@@ -78,12 +78,12 @@ def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=
             # "thumb_1024_url", 
             # "thumb_2048_url",
             "thumb_original_url", 
-            "merge_cc", 
-            "mesh", 
+            # "merge_cc", 
+            # "mesh", 
             "sequence", 
             "sfm_cluster", 
             "width",
-            # "detections",
+            "detections",
         ])
     }
         

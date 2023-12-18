@@ -4,6 +4,8 @@ import osmnx as ox
 from shapely.geometry import Point
 import pandas as pd
 from tqdm import tqdm
+import tempfile, zlib, wget
+
 
 def dump_json(data, filename,encoding='utf-8'):
     with open(filename, 'w') as f:
@@ -53,3 +55,10 @@ def selected_columns_to_str(df,desired_type=list):
         if c_type == desired_type:
             # print(column)
             df[column] = df[column].apply(lambda x: str(x))
+
+def download_and_decompress(url, output_file):
+    with tempfile.NamedTemporaryFile() as temp_file:
+        wget.download(url, out=temp_file.name)
+        with open(temp_file.name, 'rb') as f_in:
+            with open(output_file, 'wb') as f_out:
+                f_out.write(zlib.decompress(f_in.read()))

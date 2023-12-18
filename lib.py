@@ -56,9 +56,17 @@ def selected_columns_to_str(df,desired_type=list):
             # print(column)
             df[column] = df[column].apply(lambda x: str(x))
 
-def download_and_decompress(url, output_file):
-    with tempfile.NamedTemporaryFile() as temp_file:
-        wget.download(url, out=temp_file.name)
-        with open(temp_file.name, 'rb') as f_in:
-            with open(output_file, 'wb') as f_out:
-                f_out.write(zlib.decompress(f_in.read()))
+def download_and_decompress(url, output_file=None):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = os.path.join(temp_dir, 'temp')
+
+        wget.download(url, temp_path)
+        with open(temp_path, 'rb') as f_in:
+            # decompress
+            as_str = zlib.decompress(f_in.read())
+
+            if output_file:
+                with open(output_file, 'wb') as f_out:
+                    f_out.write(as_str)
+            else:
+                return json.loads(as_str)

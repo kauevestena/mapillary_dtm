@@ -169,3 +169,6 @@ tests
 
 # OSMNX cache:
 cache
+
+# big files:
+data/agua_verde.gpkg

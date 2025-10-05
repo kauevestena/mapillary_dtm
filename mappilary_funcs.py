@@ -1,22 +1,48 @@
 from lib import *
 
-import requests
-import os
-import json
 import numpy as np
 from shapely.geometry import Point, box
 from math import cos, pi
-import urllib
-import wget
-from time import sleep
-import geopandas as gpd
+import sys
+import os
 
+# Add the my_mappilary_api directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'my_mappilary_api'))
 
-def get_mapillary_token():
-    with open('mapillary_token', 'r') as f:
-        return f.readline()
+# Import functions from the external library
+from mapillary_api import (
+    get_mapillary_token,
+    get_mapillary_images_metadata as _get_mapillary_images_metadata,
+    mapillary_data_to_gdf,
+    radius_to_degrees,
+    degrees_to_radius,
+    get_bounding_box,
+    download_mapillary_image,
+    MAPPILARY_TOKEN
+)
 
-MAPPILARY_TOKEN = get_mapillary_token()
+# Keep the old function for backward compatibility by wrapping the new one
+# The old function signature was: (minLat, minLon, maxLat, maxLon, token, ...)
+# The new function signature is: (minLon, minLat, maxLon, maxLat, token, ...)
+def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token, outpath=None, params_dict=None):
+    """
+    Request images from Mapillary API given a bbox
+    This is a wrapper for backward compatibility with the old parameter order.
+    
+    Parameters:
+        minLat (float): The latitude of the first coordinate.
+        minLon (float): The longitude of the first coordinate.
+        maxLat (float): The latitude of the second coordinate.
+        maxLon (float): The longitude of the second coordinate.
+        token (str): The Mapillary API token.
+        outpath (str, optional): Path to save the response JSON.
+        params_dict (dict, optional): Custom parameters (not supported in the new API).
+
+    Returns:
+        dict: A dictionary containing the response from the API.
+    """
+    # Convert old parameter order (minLat, minLon, maxLat, maxLon) to new (minLon, minLat, maxLon, maxLat)
+    return _get_mapillary_images_metadata(minLon, minLat, maxLon, maxLat, token=token, outpath=outpath)
 
 
 #function to define a random lat, lon in the bounding box:
@@ -34,152 +60,3 @@ def random_point_in_bbox(input_bbox):
     lat = min_lat + (max_lat - min_lat) * np.random.random()
     lon = min_lon + (max_lon - min_lon) * np.random.random()
     return lon, lat
-
-def get_mapillary_images_metadata(minLat, minLon, maxLat, maxLon, token,outpath=None,params_dict=None):
-    """
-    Request images from Mapillary API given a bbox
-
-    Parameters:
-        minLat (float): The latitude of the first coordinate.
-        minLon (float): The longitude of the first coordinate.
-        maxLat (float): The latitude of the second coordinate.
-        maxLon (float): The longitude of the second coordinate.
-        token (str): The Mapillary API token.
-
-    Returns:
-        dict: A dictionary containing the response from the API.
-    """
-    url = "https://graph.mapillary.com/images"
-
-    if not params_dict:
-        params = {
-        "bbox": f"{minLon},{minLat},{maxLon},{maxLat}",
-        'limit': 5000,
-        "access_token": token,
-        "fields": ",".join([
-            "altitude", 
-            "atomic_scale", 
-            "camera_parameters", 
-            "camera_type", 
-            "captured_at",
-            "compass_angle", 
-            "computed_altitude", 
-            "computed_compass_angle", 
-            "computed_geometry",
-            "computed_rotation", 
-            "creator", 
-            "exif_orientation", 
-            "geometry", 
-            "height", 
-            # "is_pano",
-            "make", 
-            "model", 
-            # "thumb_256_url", 
-            # "thumb_1024_url", 
-            # "thumb_2048_url",
-            "thumb_original_url", 
-            # "merge_cc", 
-            # "mesh", 
-            "sequence", 
-            "sfm_cluster", 
-            "width",
-            "detections",
-        ])
-    }
-        
-    else:
-        params = params_dict
-        
-    response = requests.get(url, params=params)
-
-    as_dict = response.json()
-
-    if outpath:
-        dump_json(as_dict, outpath)
-
-    return as_dict
-
-
-
-def radius_to_degrees(radius,lat):
-    """
-    Convert a radius in meters to degrees.  
-    """
-    return radius / (111320 * cos(lat * pi / 180))
-
-def degrees_to_radius(degrees, lat):
-    """
-    Convert a radius in degrees to meters.  
-    """
-    return degrees * 111320 * cos(lat * pi / 180)
-
-def get_bounding_box(lon, lat, radius):
-    """
-    Return a bounding box tuple as (minLon, minLat, maxLon, maxLat) from a pair of coordinates and a radius, using shapely.
-
-    Parameters:
-        lon (float): The longitude of the center of the bounding box.
-        lat (float): The latitude of the center of the bounding box.
-        radius (float): The radius of the bounding box in meters.
-
-    Returns: 
-        tuple: A tuple containing the minimum and maximum longitude and latitude of the bounding box.
-    """
-
-
-    # Convert radius from meters to degrees
-    radius_deg = radius_to_degrees(radius, lat)
-
-    point = Point(lon, lat)
-    return box(point.x - radius_deg, point.y - radius_deg, point.x + radius_deg, point.y + radius_deg).bounds
-
-# function to download an image from a url:
-def download_mapillary_image(url, outfilepath,cooldown=1):
-    try:
-        wget.download(url, out=outfilepath)
-
-        if cooldown:
-            sleep(cooldown)
-    except Exception as e:
-        print('error:',e)
-
-def mapillary_data_to_gdf(data,outpath=None,filtering_polygon=None):
-    
-    if isinstance(data,str):
-        data = read_json(data)
-
-    if data.get('data'):
-        as_df = pd.DataFrame.from_records(data['data'])
-
-        if 'geometry' in as_df.columns:
-
-            as_df.geometry = as_df.geometry.apply(get_coordinates_as_point)
-
-            as_gdf = gpd.GeoDataFrame(as_df,crs='EPSG:4326',geometry='geometry')
-
-            selected_columns_to_str(as_gdf)
-
-            if filtering_polygon:
-                as_gdf = as_gdf[as_gdf.intersects(filtering_polygon)]
-
-            if outpath:
-                as_gdf.to_file(outpath)
-
-            return as_gdf
-        else:
-            return gpd.GeoDataFrame()
-    else:
-        return gpd.GeoDataFrame()
-
-# # # doesn't seems to be working, some kind of weird bug...
-# # def filter_metadata_with_polygon(data, polygon,anti_rounding_factor=1000000):
-
-# #     data_list = data['data']
-
-# #     for item in data_list:
-
-# #         point = Point(item['geometry']['coordinates'])
-
-
-# #         if not polygon.contains(point):
-# #             data_list.remove(item)

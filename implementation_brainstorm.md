@@ -18,16 +18,10 @@ This document outlines high-level ideas for generating a Digital Terrain Model (
 *   **Idea C: Clustering-based filtering.**
     *   Use a clustering algorithm like DBSCAN on the 3D point cloud. The largest cluster is likely to be the ground plane.
 
-## 3. Terrain Point Extraction
+## 3. Projecting points into Terrain
 
-*   **Idea A: Cloth Simulation Filter (CSF).**
-    *   This is a common algorithm for DTM generation from LiDAR data that can be adapted for SfM point clouds. It simulates a "cloth" draped over the inverted point cloud to separate ground from non-ground points.
-    *   **Libraries:** `CSF.py` (Python implementation of the CSF algorithm).
-*   **Idea B: Progressive Morphological Filter.**
-    *   Another established algorithm for ground filtering in LiDAR data that uses morphological operations (erosion, dilation) with an increasing window size.
-    *   **Libraries:** `PDAL` (Point Data Abstraction Library) has implementations of this.
-*   **Idea C: Voxel-based filtering.**
-    *   Divide the point cloud into a 3D grid (voxels). For each vertical column of voxels, select the lowest point as a candidate for the terrain.
+(mapillary's imagery metadata are all representing points that are "floating above the surface", so, for having twrrain points they must be projected, and for that endeavor one might take advantage of the imagery metadata, image semantic segmentation, and image operations using photogrammetry or simplified single vision metrics or even monodepth. The points are not required to be projected orthogonally on the same XY coordinates)
+
 
 ## 4. Robust Regression for DTM Generation
 

@@ -3,6 +3,9 @@
     git clone https://github.com/kauevestena/mapillary_dtm.git
 
     cd mapillary_dtm
+    
+    # Initialize and update the submodule
+    git submodule update --init --recursive
 
     <python_exec_path> -m venv --without-pip $HOME/mapillary_dtm/.venv
 

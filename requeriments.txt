@@ -1,7 +1,0 @@
-osmnx
-scipy
-wget
-tqdm
-geopandas
-mercantile
-requests

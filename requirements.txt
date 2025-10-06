@@ -1,0 +1,19 @@
+numpy
+scipy
+requests
+tqdm
+typer
+rich
+mercantile
+mapbox_vector_tile
+shapely>=2.0
+pyproj
+rasterio
+geopandas
+osmnx
+opencv-python
+scikit-image
+torch          # optional, for monodepth
+torchvision    # optional, for monodepth
+laspy[lazrs]
+matplotlib

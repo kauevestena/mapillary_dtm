@@ -171,4 +171,15 @@ tests
 cache
 
 # big files:
-data/agua_verde.gpkg
+
+# General
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+
+# Virtual env
+.venv/
+
+# IDE
+.vscode/

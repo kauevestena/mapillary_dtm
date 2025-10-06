@@ -22,6 +22,31 @@ This document outlines high-level ideas for generating a Digital Terrain Model (
 
 (mapillary's imagery metadata are all representing points that are "floating above the surface", so, for having twrrain points they must be projected, and for that endeavor one might take advantage of the imagery metadata, image semantic segmentation, and image operations using photogrammetry or simplified single vision metrics or even monodepth. The points are not required to be projected orthogonally on the same XY coordinates)
 
+*   **Idea A: Projection using local SfM point cloud vicinity.**
+    *   Use the local vicinity of the Structure from Motion (SfM) point cloud to identify ground points. For each camera position, analyze nearby 3D points from the SfM reconstruction to estimate the ground surface below the camera.
+    *   Apply statistical methods (e.g., lowest percentile of Z values, plane fitting to lowest points) to identify the terrain elevation in the camera's neighborhood.
+    *   Project the camera position vertically downward to the estimated ground surface.
+    *   **Libraries:** `numpy`, `scipy.spatial` for k-d tree nearest neighbor searches, `scikit-learn` for plane fitting.
+*   **Idea B: Image-based semantic segmentation for ground detection.**
+    *   Leverage Mapillary's semantic segmentation data to identify "road" and "ground" pixels in each image.
+    *   Use the camera's intrinsic parameters (focal length, principal point) and pose (position, orientation) to ray-trace from ground pixels to 3D space.
+    *   Estimate distance to ground using monocular depth estimation or simplified geometric assumptions (e.g., flat ground hypothesis, known camera height).
+    *   Project rays from ground pixels to intersect with an estimated ground plane or surface.
+    *   **Tools:** Mapillary's API for segmentation masks, `opencv-python` for image operations.
+    *   **Libraries:** `torch` or `tensorflow` with pre-trained monocular depth networks (e.g., MiDaS, DPT), `pyproj` for coordinate transformations.
+*   **Idea C: Monocular depth estimation for terrain projection.**
+    *   Apply monocular depth estimation neural networks to Mapillary images to generate depth maps.
+    *   Combine depth maps with semantic segmentation to focus on ground/road areas.
+    *   Use camera pose and estimated depth values to back-project ground pixels into 3D world coordinates, creating terrain points.
+    *   Filter depth estimates using confidence scores or consistency checks across multiple overlapping images.
+    *   **Libraries:** Pre-trained models like MiDaS (`torch`), DPT, or ZoeDepth for depth estimation.
+*   **Idea D: Simplified geometric projection based on camera height.**
+    *   Assume a constant or smoothly varying camera height above the road surface (e.g., typical vehicle-mounted camera height of 1.5-2.5 meters).
+    *   Project each camera position vertically downward by the estimated camera height to obtain terrain points.
+    *   Optionally refine camera height estimates using local terrain slope information or by analyzing the bottom portion of images.
+    *   This is a fast approximation that works well for relatively flat terrain.
+    *   **Libraries:** Basic geometric operations with `numpy` and `shapely`.
+
 
 ## 4. Robust Regression for DTM Generation
 

@@ -17,3 +17,4 @@ torch          # optional, for monodepth
 torchvision    # optional, for monodepth
 laspy[lazrs]
 matplotlib
+mapillary

@@ -8,12 +8,23 @@ GRID_RES_M: float = 0.5
 TILE_SIZE_M: int = 512
 
 # Corridor (OSM-based, via OSMnx)
-CORRIDOR_HALF_W_M: float = 25.0     # buffer around streets for "in-corridor" region
+CORRIDOR_HALF_W_M: float = 25.0  # buffer around streets for "in-corridor" region
 MAX_TIN_EXTRAPOLATION_M: float = 5.0  # limit when filling outside corridor
-INCLUDE_INNER_BLOCKS: bool = True   # holes inside corridor polygons are filled
+INCLUDE_INNER_BLOCKS: bool = True  # holes inside corridor polygons are filled
 OSM_HIGHWAYS = [
-    "motorway","trunk","primary","secondary","tertiary",
-    "unclassified","residential","service"
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary",
+    "unclassified",
+    "residential",
+    "service",
+    "trunk_link",
+    "motorway_link",
+    "primary_link",
+    "secondary_link",
+    "tertiary_link",
 ]
 
 # Imagery & selection
@@ -58,5 +69,20 @@ CHECKPOINT_BUFFER_M: float = 2.0
 MAPILLARY_GRAPH_URL = "https://graph.mapillary.com"
 MAPILLARY_TILES_URL = "https://tiles.mapillary.com/maps/vtp"
 DEFAULT_FIELDS = [
-    "id","sequence_id","geometry","captured_at","camera_type","camera_parameters","quality_score"
+    "id",
+    "sequence_id",
+    "geometry",
+    "captured_at",
+    "camera_type",
+    "camera_parameters",
+    "quality_score",
 ]
+
+# sample region bbox (for testing):
+# min_lon, min_lat, max_lon, max_lat = -48.596644,-27.591363,-48.589890,-27.586780
+bbox = {
+    "min_lon": -48.596644,
+    "min_lat": -27.591363,
+    "max_lon": -48.589890,
+    "max_lat": -27.586780,
+}  # Florianópolis, SC, Brazil

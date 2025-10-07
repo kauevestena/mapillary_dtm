@@ -71,7 +71,9 @@ dtm_from_mapillary/
     qa_internal.py
     qa_external.py
     reports.py
-
+    data/readme.md
+    data/qa_dtm.tif
+    data/qa_dtm_4326.tif
   osm/
     osmnx_utils.py
 
@@ -173,4 +175,3 @@ Use `io/geoutils.py` to apply geoid corrections (EGM96/2008) to convert ellipsoi
 ## Attribution & Terms
 
 Respect Mapillary’s terms and attribution requirements. OSM data is © OpenStreetMap contributors. See `ROADMAP.md` for QA steps and validation using official, held-out datasets.
-

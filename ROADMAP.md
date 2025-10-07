@@ -8,9 +8,9 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 
 ## Milestone 0 — Environment & Scaffolding
 
-- [ ] Create Python environment; `pip install -r requirements.txt`.
-- [ ] Set `MAPILLARY_TOKEN` env var.
-- [ ] Smoke-test imports: `python -m dtm_from_mapillary.cli.pipeline --help`.
+- [x] Create Python environment; `pip install -r requirements.txt`.
+- [x] Set `MAPILLARY_TOKEN` env var.
+- [x] Smoke-test imports: `python -m dtm_from_mapillary.cli.pipeline --help`.
 
 **Acceptance:** CLI prints help and exits. No runtime imports fail.
 
@@ -19,13 +19,13 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 1 — Coverage Discovery & Ingestion
 
 **Tasks**
-1. `api/tiles.py::bbox_to_z14_tiles` — Convert AOI bbox (lon/lat) to Z14 tiles.
-2. `api/mapillary_client.py`:
-   - `get_vector_tile(layer,z,x,y)`
-   - `list_sequence_ids(bbox)` using vector tiles.
-   - `list_image_ids(seq_id)` via Graph API paging.
-   - `get_image_meta(image_id)` with fields: `id, sequence, geometry, captured_at, camera_type, camera_parameters, quality_score`.
-3. `ingest/sequence_scan.py::discover_sequences` — Assemble `FrameMeta` per sequence.
+- [x] `api/tiles.py::bbox_to_z14_tiles` — Convert AOI bbox (lon/lat) to Z14 tiles.
+- [x] `api/mapillary_client.py`:
+   - [x] `get_vector_tile(layer,z,x,y)`
+   - [x] `list_sequence_ids(bbox)` using vector tiles.
+   - [x] `list_image_ids(seq_id)` via Graph API paging.
+   - [x] `get_image_meta(image_id)` with fields: `id, sequence, geometry, captured_at, camera_type, camera_parameters, quality_score`.
+- [x] `ingest/sequence_scan.py::discover_sequences` — Assemble `FrameMeta` per sequence.
 
 **Acceptance:** For a small bbox with known coverage, we can list N sequences and ~M images per sequence, saved to JSONL cache. No `computed_*` fields used.
 
@@ -34,8 +34,8 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 2 — Car-Only Filtering & Camera Models
 
 **Tasks**
-1. `ingest/sequence_filter.py::filter_car_sequences` — Compute speed from raw positions + timestamps; keep windows with 40–120 km/h.
-2. `ingest/camera_models.py::make_opensfm_model` — Build OpenSfM-compatible camera dicts for perspective/fisheye/spherical.
+- [x] `ingest/sequence_filter.py::filter_car_sequences` — Compute speed from raw positions + timestamps; keep windows with 40–120 km/h.
+- [x] `ingest/camera_models.py::make_opensfm_model` — Build OpenSfM-compatible camera dicts for perspective/fisheye/spherical.
 
 **Acceptance:** Car-only subset produced; camera models serialized. Manual spot-check of sample frames.
 
@@ -44,9 +44,9 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 3 — Semantics (Ground Masks)
 
 **Tasks**
-1. `semantics/ground_masks.py` — Load provided masks or run segmentation (road/sidewalk/terrain). Save per-image `.npz` prob-maps.
+- [x] `semantics/ground_masks.py` — Load provided masks or run segmentation (road/sidewalk/terrain). Save per-image `.npz` prob-maps.
 
-2. (Optional) `semantics/curb_edge_lane.py` — Extract curb/edge lines for breaklines and slope preservation.
+- [ ] (Optional) `semantics/curb_edge_lane.py` — Extract curb/edge lines for breaklines and slope preservation.
 
 **Acceptance:** Visual overlay for 20 random frames; ground coverage ≥80% on drivable areas; vehicles/people masked out.
 

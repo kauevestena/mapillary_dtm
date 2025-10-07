@@ -3,7 +3,7 @@ Shared dataclasses and core math utilities.
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 import numpy as np
 
 @dataclass
@@ -17,6 +17,36 @@ class FrameMeta:
     camera_type: str  # "perspective"|"fisheye"|"spherical"
     cam_params: Dict  # fx, fy, cx, cy, distortion, etc (OpenSfM-like)
     quality_score: Optional[float]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to JSON-friendly dict."""
+        return {
+            "image_id": self.image_id,
+            "seq_id": self.seq_id,
+            "captured_at_ms": int(self.captured_at_ms),
+            "lon": float(self.lon),
+            "lat": float(self.lat),
+            "alt_ellip": float(self.alt_ellip) if self.alt_ellip is not None else None,
+            "camera_type": self.camera_type,
+            "cam_params": self.cam_params,
+            "quality_score": float(self.quality_score) if self.quality_score is not None else None,
+        }
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any]) -> "FrameMeta":
+        if data.get("image_id") is None or data.get("seq_id") is None:
+            raise ValueError("FrameMeta requires image_id and seq_id")
+        return FrameMeta(
+            image_id=str(data.get("image_id")),
+            seq_id=str(data.get("seq_id")),
+            captured_at_ms=int(data.get("captured_at_ms", 0)),
+            lon=float(data.get("lon", 0.0)),
+            lat=float(data.get("lat", 0.0)),
+            alt_ellip=float(data["alt_ellip"]) if data.get("alt_ellip") is not None else None,
+            camera_type=str(data.get("camera_type", "unknown")),
+            cam_params=dict(data.get("cam_params", {})),
+            quality_score=float(data["quality_score"]) if data.get("quality_score") is not None else None,
+        )
 
 @dataclass
 class Pose:

@@ -54,6 +54,19 @@ class Pose:
     R: np.ndarray  # (3,3)
     t: np.ndarray  # (3,)
 
+
+@dataclass
+class ReconstructionResult:
+    """Simplified reconstruction payload shared across geometry stacks."""
+
+    seq_id: str
+    frames: List[FrameMeta]
+    poses: Dict[str, Pose]
+    points_xyz: np.ndarray  # (N,3) ground/sparse points
+    source: str
+    metadata: Optional[Dict[str, Any]] = None
+
+
 @dataclass
 class GroundPoint:
     x: float; y: float; z: float

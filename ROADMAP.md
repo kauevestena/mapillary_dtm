@@ -46,7 +46,7 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 **Tasks**
 - [x] `semantics/ground_masks.py` — Load provided masks or run segmentation (road/sidewalk/terrain). Save per-image `.npz` prob-maps.
 
-- [ ] (Optional) `semantics/curb_edge_lane.py` — Extract curb/edge lines for breaklines and slope preservation.
+- [x] (Optional) `semantics/curb_edge_lane.py` — Extract curb/edge lines for breaklines and slope preservation.
 
 **Acceptance:** Visual overlay for 20 random frames; ground coverage ≥80% on drivable areas; vehicles/people masked out.
 
@@ -55,9 +55,9 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 4 — Geometry Tracks (A/B/C)
 
 **Tasks**
-- **A:** `geom/sfm_opensfm.py` — Full OpenSfM reconstruction, no Mapillary seeding.
-- **B:** `geom/sfm_colmap.py` — Independent COLMAP reconstruction.
-- **C:** `geom/vo_simplified.py` — Up-to-scale VO chain.
+- [x] **A:** `geom/sfm_opensfm.py` — Full OpenSfM reconstruction, no Mapillary seeding.
+- [x] **B:** `geom/sfm_colmap.py` — Independent COLMAP reconstruction.
+- [x] **C:** `geom/vo_simplified.py` — Up-to-scale VO chain.
 
 **Acceptance:** For a test sequence (≥300 frames), both A and B converge with reprojection RMSE < 1.5 px; VO chain covers ≥90% frames.
 

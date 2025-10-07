@@ -7,6 +7,7 @@ from typing import Optional
 from ..ingest.sequence_scan import discover_sequences
 from ..ingest.sequence_filter import filter_car_sequences
 from ..semantics.ground_masks import prepare as prepare_masks
+from ..semantics.curb_edge_lane import extract_curbs_and_lanes
 from ..geom.sfm_opensfm import run as run_opensfm
 from ..geom.sfm_colmap import run as run_colmap
 from ..geom.vo_simplified import run as run_vo
@@ -33,7 +34,8 @@ def run(aoi_bbox: str,
     bbox = tuple(map(float, aoi_bbox.split(",")))
     seqs = discover_sequences(bbox, token=token)
     seqs = filter_car_sequences(seqs)
-    prepare_masks(seqs)
+    mask_index = prepare_masks(seqs)
+    curb_lines = extract_curbs_and_lanes(seqs)
 
     reconA = run_opensfm(seqs)
     reconB = run_colmap(seqs)

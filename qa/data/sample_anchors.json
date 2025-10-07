@@ -1,0 +1,154 @@
+{
+  "anchors": [
+    {
+      "seq_id": "sample-seq",
+      "anchor_id": "anchor-0",
+      "lon": -48.59447245076204,
+      "lat": -27.590489861948523,
+      "alt_ellip": 9.981797981049635,
+      "height_m": 4.847433736937233,
+      "diameter_m": 0.3,
+      "source": "qa-sample",
+      "observations": [
+        {
+          "image_id": "sample-seq-frame-0",
+          "px": 2099.0870174183883,
+          "py": 1589.8982129577475,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-1",
+          "px": 2130.3185945445525,
+          "py": 1657.7446702271027,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-2",
+          "px": 2018.771917354847,
+          "py": 1505.6694953044012,
+          "prob": 0.92
+        }
+      ]
+    },
+    {
+      "seq_id": "sample-seq",
+      "anchor_id": "anchor-1",
+      "lon": -48.59447543983508,
+      "lat": -27.5909957878933,
+      "alt_ellip": 10.268532171824923,
+      "height_m": 4.432767067905053,
+      "diameter_m": 0.3,
+      "source": "qa-sample",
+      "observations": [
+        {
+          "image_id": "sample-seq-frame-0",
+          "px": 2089.0774388109603,
+          "py": 1644.3080064681565,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-1",
+          "px": 2045.7524442540905,
+          "py": 1689.0541391107845,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-2",
+          "px": 2180.2854915222965,
+          "py": 1506.1179966067107,
+          "prob": 0.92
+        }
+      ]
+    },
+    {
+      "seq_id": "sample-seq",
+      "anchor_id": "anchor-2",
+      "lon": -48.59412170167444,
+      "lat": -27.590237591524623,
+      "alt_ellip": 9.566858333786957,
+      "height_m": 4.541412472793496,
+      "diameter_m": 0.3,
+      "source": "qa-sample",
+      "observations": [
+        {
+          "image_id": "sample-seq-frame-0",
+          "px": 2043.3198794261227,
+          "py": 1584.4233151165436,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-1",
+          "px": 2005.8081575149736,
+          "py": 1544.338333254607,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-2",
+          "px": 2087.577518730114,
+          "py": 1599.16244827637,
+          "prob": 0.92
+        }
+      ]
+    },
+    {
+      "seq_id": "sample-seq",
+      "anchor_id": "anchor-3",
+      "lon": -48.595562437925324,
+      "lat": -27.590080793068527,
+      "alt_ellip": 9.463950991798557,
+      "height_m": 4.230866541540984,
+      "diameter_m": 0.3,
+      "source": "qa-sample",
+      "observations": [
+        {
+          "image_id": "sample-seq-frame-0",
+          "px": 2057.956322918097,
+          "py": 1504.2979410531818,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-1",
+          "px": 2167.5155951325146,
+          "py": 1611.2908645304867,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-2",
+          "px": 2128.458872586489,
+          "py": 1537.1812531789435,
+          "prob": 0.92
+        }
+      ]
+    },
+    {
+      "seq_id": "sample-seq",
+      "anchor_id": "anchor-4",
+      "lon": -48.595758220080384,
+      "lat": -27.59033460962928,
+      "alt_ellip": 10.852489940971356,
+      "height_m": 4.85994652879529,
+      "diameter_m": 0.3,
+      "source": "qa-sample",
+      "observations": [
+        {
+          "image_id": "sample-seq-frame-0",
+          "px": 2144.2968815166537,
+          "py": 1642.238353939056,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-1",
+          "px": 2187.288117359892,
+          "py": 1584.421399992283,
+          "prob": 0.92
+        },
+        {
+          "image_id": "sample-seq-frame-2",
+          "px": 2166.0071386548652,
+          "py": 1634.0611132828142,
+          "prob": 0.92
+        }
+      ]
+    }
+  ]
+}

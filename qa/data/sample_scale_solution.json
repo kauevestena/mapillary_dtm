@@ -1,0 +1,15 @@
+{
+  "seq_id": "sample-seq",
+  "scale": 1.02,
+  "height_m": 1.7,
+  "rtk_residual_cm": [
+    3.0,
+    4.2
+  ],
+  "metrics": {
+    "mean_anchor_error_m": 0.18,
+    "gnss_scale_bias_pct": 1.5,
+    "vo_coverage_pct": 92.0
+  },
+  "timestamp": "2025-10-07T12:00:00Z"
+}

@@ -66,8 +66,8 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 5 — Anchors & Scale/Height Solver
 
 **Tasks**
-1. `geom/anchors.py` — Use Mapillary detections/map-features to find vertical objects, derive **footpoints**, triangulate in A & B poses.
-2. `geom/height_solver.py::solve_scale_and_h` — Estimate per-sequence metric scale and constant camera height \(h\in[1,3]\). Use GNSS deltas + anchors; robust loss; return scales & h.
+- [x] `geom/anchors.py` — Use Mapillary detections/map-features to find vertical objects, derive **footpoints**, triangulate in A & B poses.
+- [x] `geom/height_solver.py::solve_scale_and_h` — Estimate per-sequence metric scale and constant camera height \(h\in[1,3]\). Use GNSS deltas + anchors; robust loss; return scales & h.
 
 **Acceptance:** On a corridor with clear poles/signs, h in [1.2, 2.5] m; scales consistent between A/B within 1%.
 

@@ -78,6 +78,71 @@ class GroundPoint:
     tri_angle_deg: Optional[float]
     uncertainty_m: float
 
+
+@dataclass
+class AnchorObservation:
+    image_id: str
+    px: float
+    py: float
+    prob: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "image_id": self.image_id,
+            "px": float(self.px),
+            "py": float(self.py),
+            "prob": float(self.prob),
+        }
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any]) -> "AnchorObservation":
+        return AnchorObservation(
+            image_id=str(data["image_id"]),
+            px=float(data["px"]),
+            py=float(data["py"]),
+            prob=float(data.get("prob", 1.0)),
+        )
+
+
+@dataclass
+class Anchor:
+    seq_id: str
+    anchor_id: str
+    lon: float
+    lat: float
+    alt_ellip: float
+    height_m: float
+    diameter_m: float
+    source: str
+    observations: List[AnchorObservation]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "seq_id": self.seq_id,
+            "anchor_id": self.anchor_id,
+            "lon": float(self.lon),
+            "lat": float(self.lat),
+            "alt_ellip": float(self.alt_ellip),
+            "height_m": float(self.height_m),
+            "diameter_m": float(self.diameter_m),
+            "source": self.source,
+            "observations": [obs.to_dict() for obs in self.observations],
+        }
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any]) -> "Anchor":
+        return Anchor(
+            seq_id=str(data["seq_id"]),
+            anchor_id=str(data.get("anchor_id") or data.get("id") or "anchor"),
+            lon=float(data["lon"]),
+            lat=float(data["lat"]),
+            alt_ellip=float(data.get("alt_ellip", 0.0)),
+            height_m=float(data.get("height_m", 4.0)),
+            diameter_m=float(data.get("diameter_m", 0.3)),
+            source=str(data.get("source", "unknown")),
+            observations=[AnchorObservation.from_dict(o) for o in data.get("observations", [])],
+        )
+
 def wgs84_to_enu(lon: float, lat: float, h: float,
                  lon0: float, lat0: float, h0: float) -> np.ndarray:
     """

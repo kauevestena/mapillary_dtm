@@ -1,6 +1,7 @@
 """
 Typer CLI orchestrator for the DTM-from-Mapillary pipeline.
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,7 +54,7 @@ def run_pipeline(
     """
     Run the full pipeline over an AOI bbox: "lon_min,lat_min,lon_max,lat_max".
     Returns the manifest describing the run.
-    
+
     Parameters
     ----------
     aoi_bbox : str
@@ -85,18 +86,23 @@ def run_pipeline(
     ptsB = label_and_filter_points(reconB, scales)
     # Placeholder for VO+mono-derived ground points
     ptsC: list = []
-    
+
     # Apply learned uncertainty calibration if requested
     if use_learned_uncertainty:
         try:
-            from ..ml.integration import load_or_train_calibrator, apply_learned_uncertainty
-            
-            model_path = Path(uncertainty_model_path or (Path(out_dir) / "uncertainty_model.pkl"))
-            
+            from ..ml.integration import (
+                load_or_train_calibrator,
+                apply_learned_uncertainty,
+            )
+
+            model_path = Path(
+                uncertainty_model_path or (Path(out_dir) / "uncertainty_model.pkl")
+            )
+
             # For training, we need consensus first (will use for next iteration)
             # For now, apply to individual tracks
             log.info("Learned uncertainty calibration enabled")
-            
+
             # This is a simplified approach - full implementation would train on previous runs
             # Here we just demonstrate the integration point
             if model_path.exists():
@@ -105,7 +111,9 @@ def run_pipeline(
                 ptsB = apply_learned_uncertainty(ptsB, calibrator)
                 log.info("Applied learned uncertainty to tracks A and B")
         except ImportError as exc:
-            log.warning("ML dependencies not available for learned uncertainty: %s", exc)
+            log.warning(
+                "ML dependencies not available for learned uncertainty: %s", exc
+            )
         except Exception as exc:
             log.warning("Failed to apply learned uncertainty: %s", exc)
 
@@ -138,7 +146,9 @@ def run_pipeline(
     slope_deg, aspect = slope_from_plane_fit(dtm_s)
 
     # Writers (transforms/CRS omitted in scaffold)
-    geotiff_paths = write_geotiffs(out_dir, dtm_s, slope_deg, conf, transform=None, crs="EPSG:4979")
+    geotiff_paths = write_geotiffs(
+        out_dir, dtm_s, slope_deg, conf, transform=None, crs="EPSG:4979"
+    )
     laz_path = write_laz(out_dir, np.zeros((0, 3), dtype=np.float32))
 
     qa_dir = Path(out_dir) / "qa"
@@ -152,7 +162,9 @@ def run_pipeline(
     qa_reference = Path("qa/data/qa_dtm_4326.tif")
     if dtm_key in geotiff_paths and qa_reference.exists():
         try:
-            external_stats = compare_to_geotiff(geotiff_paths[dtm_key], str(qa_reference))
+            external_stats = compare_to_geotiff(
+                geotiff_paths[dtm_key], str(qa_reference)
+            )
         except Exception as exc:  # pragma: no cover
             log.warning("External QA comparison failed: %s", exc)
 
@@ -205,7 +217,7 @@ if typer is not None:
         uncertainty_model_path: Optional[str] = None,
     ) -> None:
         """Run the DTM generation pipeline.
-        
+
         Parameters
         ----------
         aoi_bbox : str
@@ -220,12 +232,13 @@ if typer is not None:
             Path to uncertainty model file
         """
         run_pipeline(
-            aoi_bbox=aoi_bbox, 
-            out_dir=out_dir, 
+            aoi_bbox=aoi_bbox,
+            out_dir=out_dir,
             token=token,
             use_learned_uncertainty=use_learned_uncertainty,
             uncertainty_model_path=uncertainty_model_path,
         )
+
 else:  # pragma: no cover - only executed when typer missing
     app = None
 
@@ -252,7 +265,9 @@ def _summarize_agreement(results: dict) -> dict:
             summary[key] = {"mean": None, "p95": None}
             continue
         mean = float(np.nanmean(arr))
-        p95 = float(np.nanpercentile(arr, 95)) if np.isfinite(arr).any() else float("nan")
+        p95 = (
+            float(np.nanpercentile(arr, 95)) if np.isfinite(arr).any() else float("nan")
+        )
         if not np.isfinite(mean):
             mean = None
         if not np.isfinite(p95):
@@ -271,5 +286,7 @@ def _constants_snapshot() -> dict:
 
 if __name__ == "__main__":
     if typer is None:
-        raise RuntimeError("typer is required to run the CLI. Install `typer` to use this entry point.")
+        raise RuntimeError(
+            "typer is required to run the CLI. Install `typer` to use this entry point."
+        )
     app()

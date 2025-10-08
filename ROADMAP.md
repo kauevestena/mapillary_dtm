@@ -76,8 +76,8 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 6 — Ground-Only 3D Extraction
 
 **Tasks**
-1. `ground/ground_extract_3d.py` — Project 3D points into nearby frames; vote with ground masks; label and filter 3D ground points; attach uncertainty & triangulation angle.
-2. `depth/monodepth.py` + `depth/plane_sweep_ground.py` — Dense auxiliary ground depth for areas of weak parallax; used only for densification (not scale).
+- [x] `ground/ground_extract_3d.py` — Project 3D points into nearby frames; vote with ground masks; label and filter 3D ground points; attach uncertainty & triangulation angle.
+- [x] `depth/monodepth.py` + `depth/plane_sweep_ground.py` — Dense auxiliary ground depth for areas of weak parallax; used only for densification (not scale).
 
 **Acceptance:** Densified ground point cloud with reasonable density (> 2 pts/m² in corridor).
 
@@ -86,9 +86,9 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 7 — Consensus & Fusion
 
 **Tasks**
-1. `ground/recon_consensus.py` — Voxelize to 0.5 m cells; require ≥2 of {A,B,C} to agree within `DZ_MAX_M` and slope within `DSLOPE_MAX_DEG`.
-2. `fusion/heightmap_fusion.py` — Lower-envelope fusion (25th percentile by default), produce DTM + confidence.
-3. `fusion/smoothing_regularization.py` — Edge-aware smoothing tuned for slope fidelity.
+- [x] `ground/recon_consensus.py` — Voxelize to 0.5 m cells; require ≥2 of {A,B,C} to agree within `DZ_MAX_M` and slope within `DSLOPE_MAX_DEG`.
+- [x] `fusion/heightmap_fusion.py` — Lower-envelope fusion (25th percentile by default), produce DTM + confidence.
+- [x] `fusion/smoothing_regularization.py` — Edge-aware smoothing tuned for slope fidelity.
 
 **Acceptance:** Visual inspection shows crowns/curbs intact; noise visibly reduced; slope continuity realistic.
 
@@ -97,13 +97,13 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 8 — Corridor→AOI via Delaunay TIN
 
 **Tasks**
-1. `osm/osmnx_utils.py` — Build corridor polygon(s) from OSM highways using OSMnx; buffer by `CORRIDOR_HALF_W_M`.
+- [x] `osm/osmnx_utils.py` — Build corridor polygon(s) from OSM highways using OSMnx; buffer by `CORRIDOR_HALF_W_M`.
 
    - Always include **inner blocks** (holes) inside corridor polygons.
 
-2. `ground/corridor_fill_tin.py` — Build TIN from accepted corridor points; sample to AOI grid outside corridor; **limit extrapolation** to `MAX_TIN_EXTRAPOLATION_M`.
+- [x] `ground/corridor_fill_tin.py` — Build TIN from accepted corridor points; sample to AOI grid outside corridor; **limit extrapolation** to `MAX_TIN_EXTRAPOLATION_M`.
 
-3. Elevated-structure masking (automatic) — Integrate with consensus/fusion masks.
+- [x] Elevated-structure masking (automatic) — Integrate with consensus/fusion masks.
 
 **Acceptance:** Outside-corridor cells are filled only where within 5 m outward from corridor footprint; inner blocks filled; elevated decks masked.
 
@@ -112,9 +112,9 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 9 — Slope & QA
 
 **Tasks**
-1. `qa/qa_internal.py::slope_from_plane_fit` — Plane-fit slope (deg and %).
-2. `qa/qa_internal.py::agreement_maps` — Height/slope disagreement rasters; view-count.
-3. `qa/qa_external.py::compare_to_geotiff` — Hold-out evaluation vs. official datasets.
+- [x] `qa/qa_internal.py::slope_from_plane_fit` — Plane-fit slope (deg and %).
+- [x] `qa/qa_internal.py::agreement_maps` — Height/slope disagreement rasters; view-count.
+- [x] `qa/qa_external.py::compare_to_geotiff` — Hold-out evaluation vs. official datasets.
 
 **Acceptance:** RMSE_z and slope RMSE reported; problem tiles flagged; HTML report generated.
 
@@ -123,11 +123,11 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 ## Milestone 10 — Packaging & Reproducibility
 
 **Tasks**
-1. `io/writers.py` — Write LAZ (with attributes) and GeoTIFFs.
+- [x] `io/writers.py` — Write LAZ (with attributes) and GeoTIFFs.
 
-2. `qa/reports.py` — HTML report with summaries, maps, histograms.
+- [x] `qa/reports.py` — HTML report with summaries, maps, histograms.
 
-3. Manifests: capture constants snapshot, git SHA, token hash.
+- [x] Manifests: capture constants snapshot, git SHA, token hash.
 
 **Acceptance:** All outputs versioned; re-running with same inputs yields same results within numerical noise.
 

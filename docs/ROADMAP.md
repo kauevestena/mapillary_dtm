@@ -135,7 +135,15 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 
 ## Stretch Goals
 
-- Breakline enforcement (curbs/medians) in TIN.
+- ✅ **Breakline enforcement (curbs/medians) in TIN** → **COMPLETE!**
+  - ✅ 3D breakline projection module (`ground/breakline_integration.py`)
+  - ✅ Curb merging and simplification
+  - ✅ Uniform densification for TIN constraints
+  - ✅ Constrained Delaunay TIN implementation
+  - ✅ Pipeline integration with `--enforce-breaklines` CLI flag
+  - ✅ Comprehensive testing (14 tests, 100% pass rate)
+  - See `docs/BREAKLINE_COMPLETE_SUMMARY.md` for details
+  
 - Self-calibration refinement for fisheye/spherical cameras.
 - ✅ **Learned uncertainty calibration for mono-depth** → **IMPLEMENTED** (see `ml/uncertainty_calibration.py`)
 

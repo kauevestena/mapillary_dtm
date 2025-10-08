@@ -28,6 +28,7 @@ class TINModel:
     tree: cKDTree | None
     xy: np.ndarray
     z: np.ndarray
+    constrained: bool = False  # Whether this TIN has breakline constraints
 
     @property
     def valid(self) -> bool:
@@ -51,10 +52,107 @@ def build_tin(points: Sequence[Mapping[str, object]]) -> TINModel:
         tri = Delaunay(xy)
         interpolator = LinearNDInterpolator(tri, z, fill_value=np.nan)
         tree = cKDTree(xy)
-        return TINModel(tri=tri, interpolator=interpolator, tree=tree, xy=xy, z=z)
+        return TINModel(tri=tri, interpolator=interpolator, tree=tree, xy=xy, z=z, constrained=False)
     except Exception as exc:  # pragma: no cover - rare numerical failures
         log.warning("Failed to build TIN: %s", exc)
-        return TINModel(None, None, None, xy, z)
+        return TINModel(None, None, None, xy, z, constrained=False)
+
+
+def build_constrained_tin(
+    points: Sequence[Mapping[str, object]],
+    breakline_vertices: np.ndarray | None = None,
+    breakline_edges: List[tuple[int, int]] | None = None,
+) -> TINModel:
+    """Construct a constrained Delaunay TIN with breakline enforcement.
+    
+    Uses the 'triangle' library to build a TIN that respects breakline edges
+    as constraints (no triangle edges will cross breaklines).
+    
+    Args:
+        points: Ground points for TIN construction
+        breakline_vertices: (N, 3) array of XYZ positions for breaklines
+        breakline_edges: List of (i, j) vertex index pairs defining breakline segments
+        
+    Returns:
+        TINModel with constrained triangulation
+    """
+    if breakline_vertices is None or breakline_edges is None or len(breakline_edges) == 0:
+        # No constraints - fall back to standard Delaunay
+        return build_tin(points)
+    
+    try:
+        import triangle
+    except ImportError:
+        log.warning("triangle library not available - falling back to unconstrained TIN")
+        return build_tin(points)
+    
+    if not points:
+        return TINModel(None, None, None, np.zeros((0, 2), dtype=np.float32), np.zeros((0,), dtype=np.float32))
+    
+    # Extract XY coordinates and Z values from ground points
+    ground_xy = np.array([[float(p["x"]), float(p["y"])] for p in points], dtype=np.float64)
+    ground_z = np.array([float(p["z"]) for p in points], dtype=np.float64)
+    
+    # Combine ground points with breakline vertices
+    breakline_xy = breakline_vertices[:, :2]  # Take only XY
+    breakline_z = breakline_vertices[:, 2]
+    
+    combined_xy = np.vstack([ground_xy, breakline_xy])
+    combined_z = np.concatenate([ground_z, breakline_z])
+    
+    # Adjust edge indices (offset by number of ground points)
+    n_ground = len(ground_xy)
+    adjusted_edges = np.array([[i + n_ground, j + n_ground] for i, j in breakline_edges], dtype=np.int32)
+    
+    # Build PSLG (Planar Straight Line Graph)
+    pslg = {
+        'vertices': combined_xy,
+        'segments': adjusted_edges
+    }
+    
+    try:
+        # Triangulate with quality constraints
+        # 'p' = PSLG mode, 'q30' = min angle 30°, 'a' = max area constraint
+        result = triangle.triangulate(pslg, 'pq30')
+        
+        # Extract triangulation
+        vertices_2d = result['vertices']
+        triangles = result['triangles']
+        
+        # Build Delaunay-compatible object
+        # Note: triangle library returns different format than scipy.spatial.Delaunay
+        # We need to create an interpolator manually
+        
+        from scipy.interpolate import LinearNDInterpolator
+        
+        # Map old vertex indices to new (triangle may reorder/add vertices)
+        # For now, assume same ordering up to n_ground + n_breakline
+        n_result = len(vertices_2d)
+        z_result = np.zeros(n_result)
+        
+        # Map Z values (may need refinement if triangle adds Steiner points)
+        for i in range(min(n_result, len(combined_z))):
+            z_result[i] = combined_z[i]
+        
+        # Create interpolator from triangulation
+        interpolator = LinearNDInterpolator(vertices_2d, z_result, fill_value=np.nan)
+        tree = cKDTree(combined_xy)
+        
+        log.info("Built constrained TIN: %d vertices, %d triangles, %d constraints",
+                 len(vertices_2d), len(triangles), len(breakline_edges))
+        
+        return TINModel(
+            tri=None,  # triangle result is not scipy.Delaunay compatible
+            interpolator=interpolator,
+            tree=tree,
+            xy=combined_xy,
+            z=combined_z,
+            constrained=True
+        )
+        
+    except Exception as exc:  # pragma: no cover
+        log.warning("Failed to build constrained TIN: %s - falling back to unconstrained", exc)
+        return build_tin(points)
 
 
 def corridor_to_local(

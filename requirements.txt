@@ -19,3 +19,4 @@ laspy[lazrs]
 matplotlib
 mapillary
 pytest
+triangle       # Constrained Delaunay triangulation for breakline enforcement

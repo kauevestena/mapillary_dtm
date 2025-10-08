@@ -91,6 +91,11 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 - **`corridor_fill_tin.py`**: Delaunay TIN expansion from corridor to AOI
   - Respects `MAX_TIN_EXTRAPOLATION_M = 5`
   - Always fills inner blocks (holes inside corridor polygons)
+  - Supports constrained TIN with breakline enforcement
+- **`breakline_integration.py`**: 3D breakline projection and constraint generation
+  - Projects 2D curb detections to 3D world coordinates
+  - Merges overlapping segments from multiple views
+  - Simplifies and densifies for TIN constraints
 
 ### `fusion/` - Surface Generation
 - **`heightmap_fusion.py`**: Lower-envelope fusion (25th percentile default) + confidence maps
@@ -132,6 +137,12 @@ INCLUDE_INNER_BLOCKS = True         # Fill holes inside corridor
 EXCLUDE_ELEVATED_STRUCTURES = True  # Auto-mask bridges/overpasses
 DZ_MAX_M = 0.25                     # Consensus height tolerance
 DSLOPE_MAX_DEG = 2.0                # Consensus slope tolerance (degrees)
+
+# Breakline enforcement (optional)
+BREAKLINE_ENABLED = False           # Toggle via CLI --enforce-breaklines
+BREAKLINE_MERGE_DIST_M = 0.5        # Merge segments within this distance
+BREAKLINE_SIMPLIFY_TOL_M = 0.1      # Douglas-Peucker tolerance
+BREAKLINE_DENSIFY_MAX_SPACING_M = 0.5  # Vertex resampling interval
 ```
 
 ---
@@ -161,14 +172,15 @@ DSLOPE_MAX_DEG = 2.0                # Consensus slope tolerance (degrees)
 
 ### Phase 5: Corridor & TIN Expansion
 14. Build OSM corridor polygon (OSMnx)
-15. Create Delaunay TIN from consensus points
-16. Sample outside corridor (≤5m extrapolation)
-17. Fill inner blocks (holes)
+15. (Optional) Project curbs to 3D and prepare breakline constraints
+16. Create Delaunay TIN from consensus points (with optional constraints)
+17. Sample outside corridor (≤5m extrapolation)
+18. Fill inner blocks (holes)
 
 ### Phase 6: Fusion & Surface Refinement
-18. Lower-envelope fusion (resist vehicle artifacts)
-19. Edge-aware smoothing (preserve crowns/curbs)
-20. Compute slope maps (degree & percentage)
+19. Lower-envelope fusion (resist vehicle artifacts)
+20. Edge-aware smoothing (preserve crowns/curbs)
+21. Compute slope maps (degree & percentage)
 
 ### Phase 7: QA & Reporting
 21. Generate agreement maps (height/slope/view-count)

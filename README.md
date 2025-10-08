@@ -119,6 +119,24 @@ dtm_from_mapillary/
      --use-learned-uncertainty \
      --uncertainty-model-path ./models/uncertainty.pkl
    ```
+   
+   **Optional: Enable breakline enforcement for curb preservation:**
+   ```bash
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out \
+     --enforce-breaklines
+   ```
+   
+   **Combined: All advanced features:**
+   ```bash
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out \
+     --use-learned-uncertainty \
+     --uncertainty-model-path ./models/uncertainty.pkl \
+     --enforce-breaklines
+   ```
 
 4. **Outputs** (ellipsoidal heights):
    - `out/dtm_0p5m_ellipsoid.tif`

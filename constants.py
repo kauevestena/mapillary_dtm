@@ -65,6 +65,15 @@ ELEVATED_METHOD: str = "auto"  # "auto" => parallax + OSM bridge/tunnel tags
 # QA
 CHECKPOINT_BUFFER_M: float = 2.0
 
+# Breakline enforcement
+BREAKLINE_ENABLED: bool = False  # Toggle via CLI
+BREAKLINE_PROJ_PROB_BAND: tuple[float, float] = (0.45, 0.6)  # Ground mask gradient range
+BREAKLINE_MERGE_DIST_M: float = 0.5  # Merge segments within this distance
+BREAKLINE_SIMPLIFY_TOL_M: float = 0.1  # Douglas-Peucker tolerance
+BREAKLINE_DENSIFY_MAX_SPACING_M: float = 0.5  # Vertex resampling interval
+BREAKLINE_MIN_LENGTH_M: float = 2.0  # Discard short segments
+BREAKLINE_MAX_HEIGHT_DEV_M: float = 0.3  # Outlier filter threshold
+
 # API
 MAPILLARY_GRAPH_URL = "https://graph.mapillary.com"
 MAPILLARY_TILES_URL = "https://tiles.mapillary.com/maps/vtp"

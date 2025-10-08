@@ -44,6 +44,10 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 
 ## 📁 Module Structure & Responsibilities
 
+### `docs/` - Project Documentation
+- **`ROADMAP.md`**: Detailed implementation tasks, milestones, and acceptance criteria
+- **`VERIFICATION_REPORT.md`**: Comprehensive verification of milestone completion status
+
 ### `api/` - External Data Access
 - **`mapillary_client.py`**: Mapillary Graph API v4 wrapper (images, sequences, vector tiles)
 - **`tiles.py`**: Web Mercator tile utilities (Z14 coverage discovery)
@@ -74,6 +78,11 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 - **`monodepth.py`**: Monocular depth estimation (auxiliary, NOT for scale)
 - **`plane_sweep_ground.py`**: Ground-focused plane-sweep stereo densification
 - **Purpose**: Fill weak-parallax regions; scale from Track A/B/C only
+
+### `ml/` - Machine Learning Components
+- **`uncertainty_calibration.py`**: Learned uncertainty estimation from consensus validation
+- **`integration.py`**: Pipeline integration helpers for ML features
+- **Features**: Replaces heuristic uncertainty with data-driven predictions
 
 ### `ground/` - Ground Point Processing
 - **`ground_extract_3d.py`**: 3D point voting with semantic masks, uncertainty tagging
@@ -213,7 +222,7 @@ DSLOPE_MAX_DEG = 2.0                # Consensus slope tolerance (degrees)
 ## 🔍 When Making Changes
 
 ### Adding New Features
-1. Check `ROADMAP.md` for alignment with project goals
+1. Check `docs/ROADMAP.md` for alignment with project goals
 2. Update corresponding test file in `tests/`
 3. Add constants to `constants.py` if configurable
 4. Update acceptance criteria
@@ -283,7 +292,7 @@ DSLOPE_MAX_DEG = 2.0                # Consensus slope tolerance (degrees)
 - Keep functions focused (single responsibility)
 
 ### Commit Messages
-Reference milestone/task from ROADMAP.md when applicable:
+Reference milestone/task from `docs/ROADMAP.md` when applicable:
 ```
 M6: Implement plane-sweep ground densifier
 
@@ -293,7 +302,7 @@ M6: Implement plane-sweep ground densifier
 ```
 
 ### Pull Requests
-- Link to ROADMAP.md task
+- Link to `docs/ROADMAP.md` task
 - Include acceptance criteria verification
 - Add/update tests
 - Update README.md if user-facing changes
@@ -325,11 +334,18 @@ M6: Implement plane-sweep ground densifier
 **"Debug consensus failures"**
 → Visualize agreement maps from `ground/recon_consensus.py`; check `DZ_MAX_M`/`DSLOPE_MAX_DEG` thresholds
 
+**"Where is the roadmap/implementation plan?"**
+→ See **[docs/ROADMAP.md](docs/ROADMAP.md)** for detailed tasks and milestones
+
+**"How do I verify implementation status?"**
+→ See **[docs/VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)** for complete verification report
+
 ---
 
 ## 📖 Further Reading
 
-- [ROADMAP.md](ROADMAP.md) - Detailed implementation tasks & acceptance criteria
+- **[docs/ROADMAP.md](docs/ROADMAP.md)** - Detailed implementation tasks & acceptance criteria
+- **[docs/VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)** - Complete verification of milestone completion
 - [README.md](README.md) - User-facing documentation & quickstart
 - [qa/data/readme.md](qa/data/readme.md) - QA dataset descriptions
 - **Mapillary API Docs**: https://www.mapillary.com/developer/api-documentation
@@ -343,13 +359,14 @@ M6: Implement plane-sweep ground densifier
 
 When assisting with this project:
 
-1. **Read** `README.md` and `ROADMAP.md` first for context
+1. **Read** `README.md` and `docs/ROADMAP.md` first for context
 2. **Check** `constants.py` for configurable parameters
 3. **Understand** the triple-track (A/B/C) redundancy philosophy
 4. **Respect** the no-external-DTM constraint
 5. **Preserve** slope fidelity in any fusion/smoothing changes
-6. **Test** changes against acceptance criteria from ROADMAP
+6. **Test** changes against acceptance criteria from `docs/ROADMAP.md`
 7. **Document** assumptions and trade-offs in code comments
+8. **Verify** implementation status in `docs/VERIFICATION_REPORT.md` if needed
 
 ---
 

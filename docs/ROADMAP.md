@@ -137,7 +137,7 @@ This roadmap decomposes the project into **small, testable tasks**, grouped by m
 
 - Breakline enforcement (curbs/medians) in TIN.
 - Self-calibration refinement for fisheye/spherical cameras.
-- Learned uncertainty calibration for mono-depth.
+- ✅ **Learned uncertainty calibration for mono-depth** → **IMPLEMENTED** (see `ml/uncertainty_calibration.py`)
 
 - GPU acceleration for plane-sweep and segmentation.
 

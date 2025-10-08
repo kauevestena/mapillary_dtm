@@ -1,6 +1,14 @@
 # DTM from Mapillary — High-Accuracy, Redundancy-Heavy Pipeline
 
-**Goal:** Generate a **0.5 m** ellipsoidal-height **DTM (ground-only)** and **slope maps** from Mapillary imagery (car sequences only), maximizing **accuracy via redundancy** and **cross-validation**. No existing DTM is used except optionally as **initialization/QA**. The pipeline focuses on **slope fidelity** (accessibility mapping).
+**Goal:** Generate a **0.5 m** ellipsoidal-height **DTM (ground-only)** and **slope maps** from Mapillary imager## Documentation
+
+- **[docs/ROADMAP.md](docs/ROADMAP.md)** - Detailed implementation tasks and acceptance criteria
+- **[docs/VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)** - Complete verification of milestone completion
+- **[agents.md](agents.md)** - Guide for AI coding assistants
+
+## Attribution & Terms
+
+Respect Mapillary's terms and attribution requirements. OSM data is © OpenStreetMap contributors. See `docs/ROADMAP.md` for QA steps and validation using official, held-out datasets.car sequences only), maximizing **accuracy via redundancy** and **cross-validation**. No existing DTM is used except optionally as **initialization/QA**. The pipeline focuses on **slope fidelity** (accessibility mapping).
 
 **Highlights**
 - Uses **two independent SfM stacks** (OpenSfM & COLMAP) + a **VO + mono-depth + ground plane-sweep** densifier for redundancy.
@@ -22,9 +30,12 @@ dtm_from_mapillary/
   constants.py
   common_core.py
   README.md
-  ROADMAP.md
   requirements.txt
   .gitignore
+
+  docs/
+    ROADMAP.md
+    VERIFICATION_REPORT.md
 
   api/
     mapillary_client.py
@@ -99,6 +110,15 @@ dtm_from_mapillary/
    ```bash
    python -m dtm_from_mapillary.cli.pipeline run --aoi-bbox "-122.45,37.76,-122.41,37.79" --out-dir ./out
    ```
+   
+   **Optional: Enable learned uncertainty calibration:**
+   ```bash
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out \
+     --use-learned-uncertainty \
+     --uncertainty-model-path ./models/uncertainty.pkl
+   ```
 
 4. **Outputs** (ellipsoidal heights):
    - `out/dtm_0p5m_ellipsoid.tif`
@@ -152,7 +172,7 @@ dtm_from_mapillary/
 - **OSM corridor**: `osm/osmnx_utils.py`
 - **QA/Reports**: `qa/*`
 
-See **[ROADMAP.md](ROADMAP.md)** for step-by-step implementation tasks and acceptance checks.
+See **[docs/ROADMAP.md](docs/ROADMAP.md)** for step-by-step implementation tasks and acceptance checks.
 
 ---
 

@@ -18,3 +18,4 @@ torchvision    # optional, for monodepth
 laspy[lazrs]
 matplotlib
 mapillary
+pytest

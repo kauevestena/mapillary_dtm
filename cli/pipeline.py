@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import typer
+
+try:  # Optional dependency for CLI usage
+    import typer
+except ImportError:  # pragma: no cover - typer is optional for library usage
+    typer = None  # type: ignore[assignment]
 
 from .. import constants
 from ..geom.anchors import find_anchors
@@ -38,17 +42,15 @@ from ..fusion.smoothing_regularization import edge_aware
 
 log = logging.getLogger(__name__)
 
-app = typer.Typer(help="DTM from Mapillary — high-accuracy pipeline")
 
-
-@app.command()
-def run(
+def run_pipeline(
     aoi_bbox: str,
     out_dir: str = "./out",
     token: Optional[str] = None,
-):
+) -> dict:
     """
     Run the full pipeline over an AOI bbox: "lon_min,lat_min,lon_max,lat_max".
+    Returns the manifest describing the run.
     """
     os.makedirs(out_dir, exist_ok=True)
     bbox = tuple(map(float, aoi_bbox.split(",")))
@@ -147,6 +149,24 @@ def run(
         "Agreement maps": str(agreement_path),
     }
     write_html(out_dir, manifest, qa_summary=qa_metrics, artifact_paths=artifact_paths)
+    return manifest
+
+
+# Backwards-compatible alias for library callers.
+run = run_pipeline
+
+if typer is not None:
+    app = typer.Typer(help="DTM from Mapillary — high-accuracy pipeline")
+
+    @app.command("run")
+    def cli_run(
+        aoi_bbox: str,
+        out_dir: str = "./out",
+        token: Optional[str] = None,
+    ) -> None:
+        run_pipeline(aoi_bbox=aoi_bbox, out_dir=out_dir, token=token)
+else:  # pragma: no cover - only executed when typer missing
+    app = None
 
 
 def _infer_origin(seqs, bbox):
@@ -189,4 +209,6 @@ def _constants_snapshot() -> dict:
 
 
 if __name__ == "__main__":
+    if typer is None:
+        raise RuntimeError("typer is required to run the CLI. Install `typer` to use this entry point.")
     app()

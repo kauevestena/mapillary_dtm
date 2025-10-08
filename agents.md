@@ -34,6 +34,14 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 
 ---
 
+## 🧰 Environment & Tooling
+
+- **Virtual environment (`.venv`)**: Always work inside the repository-local virtual environment `.venv`. If it is missing, create it with `python3 -m venv .venv` and install dependencies via `.venv/bin/pip install -r requirements.txt`. All commands (CLI, scripts, tests, linting) should be executed through `.venv/bin/python` to guarantee consistent dependency usage.
+- **Python version**: 3.10+ (actively tested on 3.12).
+- **Key packages**: `numpy`, `scipy`, `pyproj`, `shapely`, `rasterio`, `geopandas`, `osmnx`, `opencv-python`, `scikit-image`, `laspy[lazrs]`, `pytest`, plus optional `torch` / `torchvision` for mono-depth experiments.
+
+---
+
 ## 📁 Module Structure & Responsibilities
 
 ### `api/` - External Data Access

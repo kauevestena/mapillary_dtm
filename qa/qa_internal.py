@@ -8,9 +8,18 @@ from pathlib import Path
 from typing import Dict, Mapping, MutableMapping, Sequence
 
 import numpy as np
-from scipy.signal import correlate2d
 
 from .. import constants
+
+try:  # SciPy optional at runtime
+    from scipy.signal import correlate2d as _scipy_correlate2d
+except ImportError:  # pragma: no cover - fallback path tested separately
+    _scipy_correlate2d = None
+
+try:  # sliding window only available on newer NumPy
+    from numpy.lib.stride_tricks import sliding_window_view
+except ImportError:  # pragma: no cover
+    sliding_window_view = None
 
 
 def slope_from_plane_fit(dtm: np.ndarray, win: int | None = None) -> tuple[np.ndarray, np.ndarray]:
@@ -46,7 +55,7 @@ def slope_from_plane_fit(dtm: np.ndarray, win: int | None = None) -> tuple[np.nd
     dxdy_kernel = dx_kernel * dy_kernel
 
     def _corr(arr, kernel):
-        return correlate2d(arr, kernel, mode="same", boundary="symm")
+        return _correlate2d(arr, kernel)
 
     N = _corr(valid, ones_kernel)
     Sx = _corr(valid, dx_kernel)
@@ -189,3 +198,25 @@ def write_agreement_maps(
         np.savez_compressed(out_path, **results)
 
     return results
+
+
+def _correlate2d(arr: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    arr = np.asarray(arr, dtype=np.float64)
+    kernel = np.asarray(kernel, dtype=np.float64)
+    if _scipy_correlate2d is not None:
+        return _scipy_correlate2d(arr, kernel, mode="same", boundary="symm")
+
+    kh, kw = kernel.shape
+    pad_y, pad_x = kh // 2, kw // 2
+    padded = np.pad(arr, ((pad_y, pad_y), (pad_x, pad_x)), mode="symmetric")
+
+    if sliding_window_view is not None:
+        windows = sliding_window_view(padded, (kh, kw))
+        return np.tensordot(windows, kernel, axes=([2, 3], [0, 1]))
+
+    out = np.empty_like(arr, dtype=np.float64)
+    for y in range(arr.shape[0]):
+        for x in range(arr.shape[1]):
+            window = padded[y : y + kh, x : x + kw]
+            out[y, x] = float(np.sum(window * kernel))
+    return out

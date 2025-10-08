@@ -67,7 +67,10 @@ CHECKPOINT_BUFFER_M: float = 2.0
 
 # Breakline enforcement
 BREAKLINE_ENABLED: bool = False  # Toggle via CLI
-BREAKLINE_PROJ_PROB_BAND: tuple[float, float] = (0.45, 0.6)  # Ground mask gradient range
+BREAKLINE_PROJ_PROB_BAND: tuple[float, float] = (
+    0.45,
+    0.6,
+)  # Ground mask gradient range
 BREAKLINE_MERGE_DIST_M: float = 0.5  # Merge segments within this distance
 BREAKLINE_SIMPLIFY_TOL_M: float = 0.1  # Douglas-Peucker tolerance
 BREAKLINE_DENSIFY_MAX_SPACING_M: float = 0.5  # Vertex resampling interval

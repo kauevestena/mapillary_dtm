@@ -192,7 +192,11 @@ def run_pipeline(
         corridor_info = corridor_to_local(corridor_raw, lon0=lon0, lat0=lat0, h0=h0)
         if corridor_info:
             # Build TIN with optional breakline constraints
-            if enforce_breaklines and breakline_vertices is not None and breakline_edges:
+            if (
+                enforce_breaklines
+                and breakline_vertices is not None
+                and breakline_edges
+            ):
                 log.info("Building constrained TIN with breakline enforcement")
                 tin_model = build_constrained_tin(
                     points=consensus,

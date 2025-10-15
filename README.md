@@ -170,6 +170,8 @@ dtm_from_mapillary/
    - `out/report.html`
    - Cache root (metadata & imagery): `cache/mapillary/`
 
+> Advanced: To replay a canned OpenSfM reconstruction without invoking the binary, set `OPEN_SFM_FIXTURE=qa/data/opensfm_fixture/reconstruction.json`. Use `OPEN_SFM_FORCE_SYNTHETIC=1` to skip adapter attempts.
+
 ---
 
 ## Design Principles

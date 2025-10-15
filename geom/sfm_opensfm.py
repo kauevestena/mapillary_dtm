@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Dict, Iterable, List, Mapping, Optional
 
 import numpy as np
 
 from ..common_core import FrameMeta, Pose, ReconstructionResult
+from .opensfm_adapter import OpenSfMRunner, OpenSfMUnavailable
 from .utils import heading_matrix, positions_from_frames, synthetic_ground_offsets
 
 logger = logging.getLogger(__name__)
@@ -260,7 +262,7 @@ def _camera_from_frame(frame: FrameMeta) -> Dict:
     return camera
 
 
-def run(
+def _run_synthetic(
     seqs: Mapping[str, List[FrameMeta]],
     rng_seed: int = 2025,
     refine_cameras: bool = False,
@@ -357,3 +359,42 @@ def run(
         )
 
     return results
+
+
+def run(
+    seqs: Mapping[str, List[FrameMeta]],
+    rng_seed: int = 2025,
+    refine_cameras: bool = False,
+    refinement_method: str = "full",
+) -> Dict[str, ReconstructionResult]:
+    """
+    Attempt to use a real OpenSfM reconstruction (fixture or binary) and fall back to the
+    synthetic scaffold when unavailable.
+    """
+
+    if not seqs:
+        return {}
+
+    if os.getenv("OPEN_SFM_FORCE_SYNTHETIC") != "1":
+        runner = OpenSfMRunner()
+        fixture = os.getenv("OPEN_SFM_FIXTURE")
+        try:
+            results = runner.reconstruct(
+                seqs,
+                fixture_path=fixture,
+                force=False,
+            )
+            if results:
+                logger.info("OpenSfM adapter produced results using %s", fixture or "binary invocation")
+                return results
+        except OpenSfMUnavailable as exc:
+            logger.info("OpenSfM unavailable: %s; using synthetic fallback", exc)
+        except Exception as exc:
+            logger.exception("OpenSfM adapter failed: %s; falling back to synthetic path", exc)
+
+    return _run_synthetic(
+        seqs,
+        rng_seed=rng_seed,
+        refine_cameras=refine_cameras,
+        refinement_method=refinement_method,
+    )

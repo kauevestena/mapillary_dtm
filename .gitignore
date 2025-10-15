@@ -168,6 +168,9 @@ tests.ipynb
 # OSMNX cache:
 cache
 
+# Sample and test data (downloaded Mapillary data, reference DTMs, outputs)
+data/
+
 # big files:
 
 # General

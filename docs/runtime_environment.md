@@ -66,6 +66,9 @@ For GPU-enabled PyTorch replace the wheel specification in `requirements-optiona
 | Variable | Description | Required | Notes |
 | --- | --- | --- | --- |
 | `MAPILLARY_TOKEN` | OAuth token with `images:read` scope | Yes (runtime) | Alternative: define in `.env`, set `MAPILLARY_TOKEN_FILE`, or place token in repo root `mapillary_token`. |
+| `OPEN_SFM_BIN` | Path to `opensfm_run_all` (or wrapper) | No | Overrides the binary used by the OpenSfM adapter. |
+| `OPEN_SFM_FIXTURE` | Path to canned OpenSfM reconstruction | No | Enables fixture-driven runs without invoking the binary. |
+| `OPEN_SFM_FORCE_SYNTHETIC` | Force synthetic SfM scaffold | No | Set to `1` to skip adapter attempts entirely. |
 | `CUDA_VISIBLE_DEVICES` | GPU selection | No | Set when running GPU-accelerated stages. |
 | `DTM_CACHE_ROOT` | Override cache directory root | No | Defaults to `./cache`. |
 

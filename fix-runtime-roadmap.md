@@ -18,9 +18,9 @@ This document lays out an incremental plan to bring the pipeline from the curren
 - [x] Add unit tests that mock API responses to keep CI deterministic. _Covered by `tests/test_ingest_cache.py`._
 
 ## Milestone 3 — OpenSfM Track Activation
-- [ ] Integrate the true OpenSfM pipeline: data adapters, config generation, invocation, and product ingestion (poses, cameras, tracks).
-- [ ] Provide fallback paths for environments without OpenSfM (e.g., raising informative errors or running a trimmed synthetic variant).
-- [ ] Add regression tests around the interface layer—e.g., verifying we parse poses/cameras/points correctly from a canned OpenSfM output bundle.
+- [x] Integrate the true OpenSfM pipeline: data adapters, config generation, invocation, and product ingestion (poses, cameras, tracks). _See `geom/opensfm_adapter.py`, `qa/data/opensfm_fixture/reconstruction.json`._
+- [x] Provide fallback paths for environments without OpenSfM (e.g., raising informative errors or running a trimmed synthetic variant). _See `geom/sfm_opensfm.py` env toggles._
+- [x] Add regression tests around the interface layer—e.g., verifying we parse poses/cameras/points correctly from a canned OpenSfM output bundle. _See `tests/test_opensfm_adapter.py`._
 
 ## Milestone 4 — COLMAP Track Activation
 - [ ] Mirror Milestone 3 for COLMAP: prepare project directories, run sparse reconstruction, extract cameras/points.

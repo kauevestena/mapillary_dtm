@@ -9,7 +9,7 @@ This note captures the current state of the runtime pipeline and the decisions n
 | Python runtime | Base environment for CLI & libraries | 3.11–3.12 (project docs currently cite 3.12.3) | Ship `pyenv` + `requirements.txt`; verify C++ build tools for `triangle`, `laspy` extras | In use locally; needs reproducible env spec (Milestone 1) |
 | Mapillary Graph API v4 | Real-world imagery & metadata source | No version pin (Graph API); require OAuth token with `images:read` scope | Token sourced from `MAPILLARY_TOKEN` env var or `mapillary_token` file | **Live integration already implemented** (`api/mapillary_client.py`) |
 | Mapillary vector tiles | Coverage discovery | Tiles API v2 | Cache under `cache/mapillary/metadata` to reduce requests | **Live integration already implemented** |
-| OpenSfM runner | Track A sparse/dense reconstruction | Docker image `mapillary/opensfm:latest` (to be pinned once validated) | Prefer containerized invocation to avoid system-wide deps; needs large tmp volume | **Not yet wired** — `geom/sfm_opensfm.py` is synthetic |
+| OpenSfM runner | Track A sparse/dense reconstruction | Docker image `mapillary/opensfm:latest` (to be pinned once validated) | Prefer containerized invocation to avoid system-wide deps; needs large tmp volume | **Adapter scaffolded** — `geom/opensfm_adapter.py` loads fixtures, binary path TBD |
 | COLMAP CLI | Track B reconstruction parity | Release 3.8 (CUDA build optional) | Expose binary via PATH; confirm CUDA ≥ 11.8 for GPU features | **Not yet wired** — `geom/sfm_colmap.py` is synthetic |
 | CUDA toolkit & GPU drivers | Optional acceleration for COLMAP & dense depth | CUDA 12.1 + driver 535+ (aligns with PyTorch 2.2 LTS) | Required only when enabling GPU paths; document CPU fallback | **Planned** — current code paths default to CPU stubs |
 | PyTorch + torchvision | Learned mono-depth & uncertainty calibration | PyTorch 2.2 + torchvision 0.17 (CPU by default) | Optional extras in `requirements.txt`; guard runtime errors when unavailable | Imported in code but all usages are synthetic placeholders |
@@ -21,7 +21,7 @@ This note captures the current state of the runtime pipeline and the decisions n
 | Domain | Module(s) | Current Behavior | Gaps to Production |
 | --- | --- | --- | --- |
 | Mapillary ingestion | `api/mapillary_client.py`, `ingest/sequence_scan.py`, `ingest/sequence_filter.py` | Connects to live Graph API, performs bbox discovery, caching, filtering | Need rate-limit guards, retry telemetry, fixture cassette for tests |
-| SfM (Track A) | `geom/sfm_opensfm.py` | Generates deterministic synthetic poses/points; no external call | Replace with OpenSfM invocation + ingest actual outputs; add failure handling |
+| SfM (Track A) | `geom/sfm_opensfm.py`, `geom/opensfm_adapter.py` | Attempts real OpenSfM via adapter, falls back to synthetic scaffolding; fixture support available | Wire full binary invocation + imagery staging, extend tests to cover real outputs |
 | SfM (Track B) | `geom/sfm_colmap.py` | Synthetic COLMAP mimic with RNG decorrelation | Swap for real COLMAP CLI workflow, parse outputs, enforce frame consistency |
 | Visual odometry | `geom/vo_simplified.py` | Deterministic synthetic relative trajectory | Implement real VO (e.g., OpenCV feature tracking), manage scale handoff |
 | Densification / mono-depth | `depth/monodepth.py`, `depth/plane_sweep_ground.py`, `ground/ground_extract_3d.py` | Procedural depth grids & plane sweep, cached locally | Integrate trained mono-depth model + true plane-sweep; respect GPU availability |

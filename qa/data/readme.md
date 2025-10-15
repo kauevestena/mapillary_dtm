@@ -15,6 +15,11 @@ Same ground truth DTM data as `qa_dtm.tif`, but reprojected for comparison purpo
 - **Horizontal CRS**: EPSG:4326 (WGS84 geographic coordinates)
 - This version facilitates comparisons with data in geographic coordinates
 
+### `opensfm_fixture/`
+Reference reconstruction exported from OpenSfM for adapter regression tests.
+- Contains a minimal `reconstruction.json` bundle used by `geom/opensfm_adapter.py`
+- Enables fixture-driven runs without invoking the real OpenSfM binary
+
 ## Purpose
 
 These files serve as reference datasets for:

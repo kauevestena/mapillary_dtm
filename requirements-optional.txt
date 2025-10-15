@@ -1,0 +1,5 @@
+# Optional ML / acceleration stack
+# Install with: pip install -r requirements-optional.txt
+
+torch==2.2.0
+torchvision==0.17.0

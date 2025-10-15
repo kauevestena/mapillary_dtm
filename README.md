@@ -96,17 +96,29 @@ dtm_from_mapillary/
 
 ## Quickstart
 
-1. **Install dependencies** (create a new environment first):
+1. **Provision the environment**:
+   - Follow `docs/runtime_environment.md` for system packages and external tools.
+   - Create a fresh virtualenv and install core dependencies:
    ```bash
    pip install -r requirements.txt
    ```
+   - Optional extras:
+     ```bash
+     pip install -r requirements-optional.txt    # ML acceleration (PyTorch)
+     pip install -r requirements-dev.txt         # Developer tools + tests
+     ```
 
-2. **Set Mapillary API token** (Graph API v4):
+2. **Validate your setup** (ensures COLMAP, Docker, tokens are in place):
+   ```bash
+   python scripts/check_env.py --full
+   ```
+
+3. **Set Mapillary API token** (Graph API v4):
    ```bash
    export MAPILLARY_TOKEN="YOUR_TOKEN_HERE"
    ```
 
-3. **Run the pipeline** over a bounding box (lon_min,lat_min,lon_max,lat_max):
+4. **Run the pipeline** over a bounding box (lon_min,lat_min,lon_max,lat_max):
    ```bash
    python -m dtm_from_mapillary.cli.pipeline run --aoi-bbox "-122.45,37.76,-122.41,37.79" --out-dir ./out
    ```
@@ -138,7 +150,7 @@ dtm_from_mapillary/
      --enforce-breaklines
    ```
 
-4. **Outputs** (ellipsoidal heights):
+5. **Outputs** (ellipsoidal heights):
    - `out/dtm_0p5m_ellipsoid.tif`
    - `out/slope_deg.tif`, `out/slope_pct.tif`
    - `out/confidence.tif`

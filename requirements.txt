@@ -13,10 +13,11 @@ geopandas
 osmnx
 opencv-python
 scikit-image
-torch          # optional, for monodepth
-torchvision    # optional, for monodepth
 laspy[lazrs]
 matplotlib
 mapillary
-pytest
 triangle       # Constrained Delaunay triangulation for breakline enforcement
+
+# Optional / heavyweight extras:
+# - See requirements-optional.txt for ML acceleration (PyTorch, torchvision).
+# - See requirements-dev.txt for testing and tooling dependencies.

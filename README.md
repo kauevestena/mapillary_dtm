@@ -149,6 +149,16 @@ dtm_from_mapillary/
      --cache-imagery \
      --imagery-per-sequence 3
    ```
+
+   **Optional: Tune COLMAP runtime (threads/GPU):**
+   ```bash
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out \
+     --colmap-threads 12 \
+     --colmap-use-gpu
+   ```
+   > Defaults: `--colmap-threads 8`, `--no-colmap-use-gpu`
    
    **Combined: All advanced features:**
    ```bash

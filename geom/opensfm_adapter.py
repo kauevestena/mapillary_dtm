@@ -179,7 +179,7 @@ class OpenSfMRunner:
                 poses=poses,
                 points_xyz=points_array,
                 source="opensfm",
-                metadata={"fixture": str(fixture_path)},
+                metadata={"fixture": str(fixture_path), "coordinate_frame": "enu"},
             )
 
         return results

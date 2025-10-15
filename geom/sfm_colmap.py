@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Dict, List, Mapping, Optional
 
 import numpy as np
 
+from .. import constants
 from ..common_core import FrameMeta, Pose, ReconstructionResult
+from .colmap_adapter import COLMAPConfig, COLMAPRunner, COLMAPUnavailable
 from .utils import heading_matrix, positions_from_frames, synthetic_ground_offsets
 
 logger = logging.getLogger(__name__)
@@ -260,11 +263,71 @@ def _refine_sequence_cameras(
     return refined_frames, metadata
 
 
-def run(
+def _apply_refinement_to_results(
+    base_results: Dict[str, ReconstructionResult],
+    refine_cameras: bool,
+    refinement_method: str,
+    rng_seed: int,
+) -> Dict[str, ReconstructionResult]:
+    if not refine_cameras:
+        return base_results
+
+    rng = np.random.default_rng(rng_seed)
+    refined_results: Dict[str, ReconstructionResult] = {}
+    for seq_id, result in base_results.items():
+        frames = result.frames
+        points_xyz = result.points_xyz
+        poses = result.poses
+        metadata = dict(result.metadata or {})
+        metadata["rng_seed"] = rng_seed
+        metadata.setdefault("coordinate_frame", "enu")
+
+        if frames and points_xyz.shape[0] >= 20:
+            try:
+                refined_frames, refine_meta = _refine_sequence_cameras(
+                    frames=frames,
+                    poses=poses,
+                    points_xyz=points_xyz,
+                    method=refinement_method,
+                    rng=rng,
+                )
+                metadata.update(refine_meta)
+                metadata["cameras_refined"] = True
+                logger.info(
+                    "COLMAP sequence %s: Camera refinement successful "
+                    "(%d/%d cameras)",
+                    seq_id,
+                    refine_meta.get("refined_count", 0),
+                    len(frames),
+                )
+                frames_out = refined_frames
+            except Exception as exc:  # pragma: no cover - safety net
+                logger.warning("COLMAP sequence %s: camera refinement failed: %s", seq_id, exc)
+                metadata.setdefault("cameras_refined", False)
+                frames_out = frames
+        else:
+            metadata.setdefault("cameras_refined", False)
+            metadata.setdefault("refined_count", 0)
+            frames_out = frames
+
+        refined_results[seq_id] = ReconstructionResult(
+            seq_id=seq_id,
+            frames=list(frames_out),
+            poses=poses,
+            points_xyz=points_xyz,
+            source=result.source,
+            metadata=metadata,
+        )
+    return refined_results
+
+
+def _run_synthetic(
     seqs: Mapping[str, List[FrameMeta]],
     rng_seed: int = 4025,
     refine_cameras: bool = False,
     refinement_method: str = "full",
+    *,
+    include_metadata: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> Dict[str, ReconstructionResult]:
     """
     Produce pseudo-COLMAP reconstructions, decorrelated from OpenSfM.
@@ -324,7 +387,10 @@ def run(
             "rng_seed": rng_seed,
             "point_count": int(points_xyz.shape[0]),
             "cameras_refined": False,
+            "coordinate_frame": "enu",
         }
+        if include_metadata:
+            metadata.update(include_metadata.get(seq_id, {}))
 
         # Apply self-calibration if requested
         refined_frames = frames
@@ -361,7 +427,101 @@ def run(
     return results
 
 
+def run(
+    seqs: Mapping[str, List[FrameMeta]],
+    rng_seed: int = 4025,
+    refine_cameras: bool = False,
+    refinement_method: str = "full",
+    *,
+    threads: Optional[int] = None,
+    use_gpu: Optional[bool] = None,
+    fixture_path: Optional[str | os.PathLike[str]] = None,
+    force: bool = False,
+    workspace_root: Optional[str | os.PathLike[str]] = None,
+) -> Dict[str, ReconstructionResult]:
+    """
+    Attempt to use a real COLMAP reconstruction (fixture or binary) and fall back to the
+    synthetic scaffold when unavailable.
+    """
+
+    if not seqs:
+        return {}
+
+    if fixture_path is None:
+        fixture_env = os.getenv("COLMAP_FIXTURE")
+        if fixture_env:
+            fixture_path = fixture_env
+
+    threads = _select_threads(threads)
+    use_gpu = _select_use_gpu(use_gpu)
+
+    if os.getenv("COLMAP_FORCE_SYNTHETIC") != "1":
+        config = COLMAPConfig.from_kwargs(
+            threads=threads,
+            use_gpu=use_gpu,
+            workspace_root=workspace_root,
+        )
+        runner = COLMAPRunner(config=config, workspace_root=workspace_root)
+        try:
+            base_results = runner.reconstruct(
+                seqs,
+                fixture_path=fixture_path,
+                force=force,
+            )
+            if base_results:
+                logger.info(
+                    "COLMAP adapter produced results using %s",
+                    fixture_path or "binary invocation",
+                )
+                processed = _apply_refinement_to_results(
+                    base_results,
+                    refine_cameras=refine_cameras,
+                    refinement_method=refinement_method,
+                    rng_seed=rng_seed,
+                )
+                return processed
+        except COLMAPUnavailable as exc:
+            logger.info("COLMAP unavailable: %s; using synthetic fallback", exc)
+        except Exception as exc:  # pragma: no cover - unexpected adapter failure
+            logger.exception(
+                "COLMAP adapter failed: %s; falling back to synthetic path",
+                exc,
+            )
+
+    return _run_synthetic(
+        seqs,
+        rng_seed=rng_seed,
+        refine_cameras=refine_cameras,
+        refinement_method=refinement_method,
+    )
+
+
 def _yaw_perturb(R: np.ndarray, delta: float) -> np.ndarray:
     c, s = np.cos(delta), np.sin(delta)
     J = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
     return J @ R
+
+
+def _select_threads(explicit: Optional[int]) -> int:
+    if explicit is not None:
+        return explicit
+    env_value = os.getenv("COLMAP_THREADS")
+    if env_value:
+        try:
+            return max(1, int(env_value))
+        except ValueError:
+            logger.warning(
+                "Invalid COLMAP_THREADS value '%s'; using default %d",
+                env_value,
+                constants.COLMAP_DEFAULT_THREADS,
+            )
+    return constants.COLMAP_DEFAULT_THREADS
+
+
+def _select_use_gpu(explicit: Optional[bool]) -> bool:
+    if explicit is not None:
+        return explicit
+    env_value = os.getenv("COLMAP_USE_GPU")
+    if env_value is not None:
+        return env_value.strip() in {"1", "true", "TRUE", "True"}
+    return constants.COLMAP_USE_GPU

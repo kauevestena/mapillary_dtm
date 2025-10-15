@@ -37,6 +37,8 @@ QUALITY_SCORE_MIN: float = 0.2
 MIN_TRIANG_ANGLE_DEG: float = 2.0
 RANSAC_THRESH_PX: float = 1.0
 LO_WINDOW_N: int = 5
+COLMAP_DEFAULT_THREADS: int = 8
+COLMAP_USE_GPU: bool = False
 
 # Height & scale
 H_MIN_M: float = 1.0

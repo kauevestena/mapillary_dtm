@@ -68,6 +68,42 @@ class ReconstructionResult:
     points_xyz: np.ndarray  # (N,3) ground/sparse points
     source: str
     metadata: Optional[Dict[str, Any]] = None
+    coordinate_frame: str = "enu"
+
+    def __post_init__(self) -> None:
+        if self.points_xyz.ndim != 2 or self.points_xyz.shape[1] != 3:
+            raise ValueError(
+                f"points_xyz must have shape (N, 3); received {self.points_xyz.shape}"
+            )
+        if not np.isfinite(self.points_xyz).all():
+            raise ValueError("points_xyz contains non-finite values")
+
+        for image_id, pose in self.poses.items():
+            if pose.R.shape != (3, 3) or pose.t.shape != (3,):
+                raise ValueError(f"Pose for {image_id} has invalid shape")
+            if not np.isfinite(pose.R).all() or not np.isfinite(pose.t).all():
+                raise ValueError(f"Pose for {image_id} contains non-finite values")
+
+        allowed_frames = {"enu"}
+        if self.coordinate_frame not in allowed_frames:
+            raise ValueError(
+                f"Unsupported coordinate frame '{self.coordinate_frame}'. "
+                f"Allowed: {sorted(allowed_frames)}"
+            )
+
+        if self.metadata is None:
+            self.metadata = {}
+        elif not isinstance(self.metadata, dict):
+            raise TypeError("metadata must be a dict if provided")
+
+        frame_tag = self.metadata.get("coordinate_frame")
+        if frame_tag is None:
+            self.metadata["coordinate_frame"] = self.coordinate_frame
+        elif frame_tag != self.coordinate_frame:
+            raise ValueError(
+                "metadata coordinate_frame mismatch: "
+                f"{frame_tag} vs {self.coordinate_frame}"
+            )
 
 
 @dataclass

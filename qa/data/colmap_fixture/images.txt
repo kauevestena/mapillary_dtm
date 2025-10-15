@@ -1,0 +1,7 @@
+# Image list with two entries:
+#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, IMAGE_NAME
+# Number of images: 2
+1 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1 seqA-frame-0
+0 0 0
+2 0.9961947 0.0 0.0 0.08715574 -1.95225069 -0.44577713 0.0 1 seqA-frame-1
+0 0 0

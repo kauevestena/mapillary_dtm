@@ -324,6 +324,7 @@ def _run_synthetic(
             "rng_seed": rng_seed,
             "point_count": int(points_xyz.shape[0]),
             "cameras_refined": False,
+            "coordinate_frame": "enu",
         }
 
         # Apply self-calibration if requested

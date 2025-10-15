@@ -62,6 +62,8 @@ def run_pipeline(
     enforce_breaklines: bool = False,
     cache_imagery: bool = False,
     imagery_per_sequence: int = 5,
+    colmap_threads: int = constants.COLMAP_DEFAULT_THREADS,
+    colmap_use_gpu: bool = constants.COLMAP_USE_GPU,
 ) -> dict:
     """
     Run the full pipeline over an AOI bbox: "lon_min,lat_min,lon_max,lat_max".
@@ -85,6 +87,10 @@ def run_pipeline(
         Prefetch Mapillary thumbnails into the local cache (default: False)
     imagery_per_sequence : int
         Maximum thumbnails to cache per retained sequence.
+    colmap_threads : int
+        Thread budget for COLMAP feature extraction / reconstruction.
+    colmap_use_gpu : bool
+        Enable COLMAP GPU paths (requires CUDA build).
     """
     os.makedirs(out_dir, exist_ok=True)
     bbox = tuple(map(float, aoi_bbox.split(",")))
@@ -108,7 +114,11 @@ def run_pipeline(
     curb_lines = extract_curbs_and_lanes(seqs)
 
     reconA = run_opensfm(seqs)
-    reconB = run_colmap(seqs)
+    reconB = run_colmap(
+        seqs,
+        threads=colmap_threads,
+        use_gpu=colmap_use_gpu,
+    )
     vo = run_vo(seqs)
 
     anchors = find_anchors(seqs, token=token)
@@ -285,6 +295,12 @@ def run_pipeline(
                 "cache_root": constants.MAPILLARY_CACHE_ROOT,
             },
         },
+        "reconstruction": {
+            "colmap": {
+                "threads": colmap_threads,
+                "use_gpu": colmap_use_gpu,
+            }
+        },
         "breaklines": breakline_stats,
         "outputs": {
             "geotiffs": geotiff_paths,
@@ -329,6 +345,14 @@ if typer is not None:
         enforce_breaklines: bool = False,
         cache_imagery: bool = False,
         imagery_per_sequence: int = 5,
+        colmap_threads: int = typer.Option(
+            constants.COLMAP_DEFAULT_THREADS,
+            help="Thread budget for COLMAP feature extraction / mapping.",
+        ),
+        colmap_use_gpu: bool = typer.Option(
+            constants.COLMAP_USE_GPU,
+            help="Enable COLMAP GPU paths (requires CUDA-enabled build).",
+        ),
     ) -> None:
         """Run the DTM generation pipeline.
 
@@ -350,6 +374,10 @@ if typer is not None:
             Prefetch Mapillary thumbnails into cache
         imagery_per_sequence : int
             How many thumbnails to cache per sequence (when enabled)
+        colmap_threads : int
+            Thread budget for COLMAP feature extraction / reconstruction
+        colmap_use_gpu : bool
+            Enable COLMAP GPU pipelines (requires CUDA build)
         """
         run_pipeline(
             aoi_bbox=aoi_bbox,
@@ -360,6 +388,8 @@ if typer is not None:
             enforce_breaklines=enforce_breaklines,
             cache_imagery=cache_imagery,
             imagery_per_sequence=imagery_per_sequence,
+            colmap_threads=colmap_threads,
+            colmap_use_gpu=colmap_use_gpu,
         )
 
 else:  # pragma: no cover - only executed when typer missing

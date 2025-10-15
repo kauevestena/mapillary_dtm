@@ -394,5 +394,25 @@ def test_colmap_vs_opensfm_refinement_independence():
     assert abs(colmap_focal - opensfm_focal) > 0.001  # Some difference expected
 
 
+def test_colmap_fixture_loader(monkeypatch: pytest.MonkeyPatch):
+    """COLMAP adapter should load fixtures when provided."""
+    seqs = {"seqA": _build_frames("seqA", n_frames=2)}
+    fixture_dir = Path(__file__).resolve().parents[1] / "qa" / "data" / "colmap_fixture"
+    monkeypatch.delenv("COLMAP_FORCE_SYNTHETIC", raising=False)
+    monkeypatch.setenv("COLMAP_FIXTURE", str(fixture_dir))
+
+    results = run(seqs, rng_seed=123, refine_cameras=False)
+
+    assert "seqA" in results
+    result = results["seqA"]
+    assert result.metadata["fixture"].endswith("colmap_fixture")
+    assert result.metadata["coordinate_frame"] == "enu"
+    pts = result.points_xyz
+    assert pts.shape == (3, 3)
+    pose0 = result.poses["seqA-frame-0"].t
+    pose1 = result.poses["seqA-frame-1"].t
+    assert not np.allclose(pose0, pose1)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

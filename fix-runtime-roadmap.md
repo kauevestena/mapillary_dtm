@@ -23,9 +23,9 @@ This document lays out an incremental plan to bring the pipeline from the curren
 - [x] Add regression tests around the interface layer—e.g., verifying we parse poses/cameras/points correctly from a canned OpenSfM output bundle. _See `tests/test_opensfm_adapter.py`._
 
 ## Milestone 4 — COLMAP Track Activation
-- [ ] Mirror Milestone 3 for COLMAP: prepare project directories, run sparse reconstruction, extract cameras/points.
-- [ ] Ensure COLMAP outputs respect the same coordinate frames as OpenSfM; add consistency checks in `ReconstructionResult`.
-- [ ] Surface configuration knobs (threads, GPU usage) via CLI flags and document defaults.
+- [x] Mirror Milestone 3 for COLMAP: prepare project directories, run sparse reconstruction, extract cameras/points.
+- [x] Ensure COLMAP outputs respect the same coordinate frames as OpenSfM; add consistency checks in `ReconstructionResult`.
+- [x] Surface configuration knobs (threads, GPU usage) via CLI flags and document defaults.
 
 ## Milestone 5 — VO + Dense Support
 - [ ] Implement the VO chain against real image streams (e.g., OpenCV-based feature tracking) and expose scale metadata to the solver.

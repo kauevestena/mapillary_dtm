@@ -170,6 +170,15 @@ cache
 
 # Sample and test data (downloaded Mapillary data, reference DTMs, outputs)
 data/
+!qa/data/
+qa/data/*
+!qa/data/readme.md
+!qa/data/qa_dtm.tif
+!qa/data/qa_dtm_4326.tif
+!qa/data/sample_anchors.json
+!qa/data/sample_scale_solution.json
+!qa/data/colmap_fixture/
+!qa/data/colmap_fixture/**
 
 # big files:
 

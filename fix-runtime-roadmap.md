@@ -13,9 +13,9 @@ This document lays out an incremental plan to bring the pipeline from the curren
 - [x] Add automated checks (e.g., `scripts/check_env.py`) that verify optional binaries and provide actionable errors instead of silent fallbacks. _Implemented in `scripts/check_env.py`._
 
 ## Milestone 2 — Real Data Ingestion
-- [ ] Replace synthetic sequence discovery with Mapillary API calls; move tokens to config (`MAPILLARY_TOKEN` env, `.env` file, or secrets manager).
-- [ ] Implement caching of raw metadata/imagery with clear directory layout and size guards.
-- [ ] Add unit tests that mock API responses to keep CI deterministic.
+- [x] Replace synthetic sequence discovery with Mapillary API calls; move tokens to config (`MAPILLARY_TOKEN` env, `.env` file, or secrets manager). _See `ingest/sequence_scan.py`, `api/mapillary_client.py`._
+- [x] Implement caching of raw metadata/imagery with clear directory layout and size guards. _See `ingest/cache_utils.py`, `ingest/imagery_cache.py`, `constants.py`._
+- [x] Add unit tests that mock API responses to keep CI deterministic. _Covered by `tests/test_ingest_cache.py`._
 
 ## Milestone 3 — OpenSfM Track Activation
 - [ ] Integrate the true OpenSfM pipeline: data adapters, config generation, invocation, and product ingestion (poses, cameras, tracks).

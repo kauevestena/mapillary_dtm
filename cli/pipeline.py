@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover - typer is optional for library usage
     typer = None  # type: ignore[assignment]
 
 from .. import constants
+from ..api.mapillary_client import MapillaryClient
 from ..geom.anchors import find_anchors
 from ..geom.height_solver import solve_scale_and_h
 from ..geom.sfm_colmap import run as run_colmap
@@ -38,6 +39,7 @@ from ..ground.breakline_integration import (
 )
 from ..ingest.sequence_filter import filter_car_sequences
 from ..ingest.sequence_scan import discover_sequences
+from ..ingest.imagery_cache import prefetch_imagery as cache_sequence_imagery
 from ..io.writers import write_geotiffs, write_laz
 from ..osm.osmnx_utils import corridor_from_osm_bbox
 from ..qa.qa_external import compare_to_geotiff
@@ -58,6 +60,8 @@ def run_pipeline(
     use_learned_uncertainty: bool = False,
     uncertainty_model_path: Optional[str] = None,
     enforce_breaklines: bool = False,
+    cache_imagery: bool = False,
+    imagery_per_sequence: int = 5,
 ) -> dict:
     """
     Run the full pipeline over an AOI bbox: "lon_min,lat_min,lon_max,lat_max".
@@ -77,11 +81,29 @@ def run_pipeline(
         Path to saved uncertainty model (will train if not found)
     enforce_breaklines : bool
         Enable breakline enforcement in TIN (default: False)
+    cache_imagery : bool
+        Prefetch Mapillary thumbnails into the local cache (default: False)
+    imagery_per_sequence : int
+        Maximum thumbnails to cache per retained sequence.
     """
     os.makedirs(out_dir, exist_ok=True)
     bbox = tuple(map(float, aoi_bbox.split(",")))
-    seqs = discover_sequences(bbox, token=token)
+    map_client = MapillaryClient(token=token)
+    seqs = discover_sequences(bbox, token=token, client=map_client)
     seqs = filter_car_sequences(seqs)
+    imagery_cache_stats = {}
+    if cache_imagery:
+        imagery_cache_stats = cache_sequence_imagery(
+            seqs,
+            client=map_client,
+            max_per_sequence=imagery_per_sequence,
+        )
+        if imagery_cache_stats:
+            log.info(
+                "Cached thumbnails for %d sequences (%d images)",
+                len(imagery_cache_stats),
+                sum(imagery_cache_stats.values()),
+            )
     mask_index = prepare_masks(seqs)
     curb_lines = extract_curbs_and_lanes(seqs)
 
@@ -254,6 +276,15 @@ def run_pipeline(
         "corridor_source": corridor_info.get("source") if corridor_info else None,
         "corridor_buffer_m": corridor_info.get("buffer_m") if corridor_info else None,
         "tin_samples": len(tin_samples),
+        "ingestion": {
+            "sequence_count": len(seqs),
+            "imagery_cache": {
+                "enabled": cache_imagery,
+                "sequences": len(imagery_cache_stats) if imagery_cache_stats else 0,
+                "images": int(sum(imagery_cache_stats.values())) if imagery_cache_stats else 0,
+                "cache_root": constants.MAPILLARY_CACHE_ROOT,
+            },
+        },
         "breaklines": breakline_stats,
         "outputs": {
             "geotiffs": geotiff_paths,
@@ -296,6 +327,8 @@ if typer is not None:
         use_learned_uncertainty: bool = False,
         uncertainty_model_path: Optional[str] = None,
         enforce_breaklines: bool = False,
+        cache_imagery: bool = False,
+        imagery_per_sequence: int = 5,
     ) -> None:
         """Run the DTM generation pipeline.
 
@@ -313,6 +346,10 @@ if typer is not None:
             Path to uncertainty model file
         enforce_breaklines : bool
             Enable breakline enforcement in TIN construction
+        cache_imagery : bool
+            Prefetch Mapillary thumbnails into cache
+        imagery_per_sequence : int
+            How many thumbnails to cache per sequence (when enabled)
         """
         run_pipeline(
             aoi_bbox=aoi_bbox,
@@ -321,6 +358,8 @@ if typer is not None:
             use_learned_uncertainty=use_learned_uncertainty,
             uncertainty_model_path=uncertainty_model_path,
             enforce_breaklines=enforce_breaklines,
+            cache_imagery=cache_imagery,
+            imagery_per_sequence=imagery_per_sequence,
         )
 
 else:  # pragma: no cover - only executed when typer missing

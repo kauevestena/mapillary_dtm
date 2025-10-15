@@ -30,21 +30,77 @@ from .tiles import bbox_to_z14_tiles
 
 log = logging.getLogger(__name__)
 
+_TOKEN_FILE_CANDIDATES = (
+    "mapillary_token",
+    ".secrets/mapillary_token",
+    "config/mapillary_token",
+)
+_ENV_FILE_CANDIDATES = (".env", "config/runtime.env")
 
-def _read_token_from_file() -> Optional[str]:
-    """Read token from `mapillary_token` file in repo root, if present."""
-    repo_root = Path(__file__).resolve().parents[2]
-    token_path = repo_root / "mapillary_token"
-    if not token_path.exists():
+
+def _parse_token_line(line: str) -> Optional[str]:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if "=" in stripped:
+        key, value = stripped.split("=", 1)
+        if key.strip() != "MAPILLARY_TOKEN":
+            return None
+        candidate = value.strip().strip('"').strip("'")
+    else:
+        candidate = stripped
+    return candidate or None
+
+
+def _read_token_from_path(path: Path) -> Optional[str]:
+    if not path.exists():
         return None
     try:
-        for line in token_path.read_text(encoding="utf8").splitlines():
-            stripped = line.strip()
-            if stripped and not stripped.startswith("#"):
-                return stripped
+        for line in path.read_text(encoding="utf8").splitlines():
+            candidate = _parse_token_line(line)
+            if candidate:
+                return candidate
     except OSError as exc:  # pragma: no cover - unlikely but worth logging
-        log.warning("Failed to read token file %s: %s", token_path, exc)
+        log.warning("Failed to read token file %s: %s", path, exc)
     return None
+
+
+def _read_token_from_env_files(repo_root: Path) -> Optional[str]:
+    for rel_path in _ENV_FILE_CANDIDATES:
+        token = _read_token_from_path(repo_root / rel_path)
+        if token:
+            return token
+    return None
+
+
+def _read_token_from_known_files(repo_root: Path) -> Optional[str]:
+    for rel_path in _TOKEN_FILE_CANDIDATES:
+        token = _read_token_from_path(repo_root / rel_path)
+        if token:
+            return token
+    return None
+
+
+def _resolve_token(explicit: Optional[str]) -> Optional[str]:
+    if explicit:
+        return explicit
+
+    env_token = os.getenv("MAPILLARY_TOKEN")
+    if env_token:
+        return env_token
+
+    token_file_env = os.getenv("MAPILLARY_TOKEN_FILE")
+    if token_file_env:
+        token = _read_token_from_path(Path(token_file_env).expanduser())
+        if token:
+            return token
+
+    repo_root = Path(__file__).resolve().parents[2]
+    token = _read_token_from_env_files(repo_root)
+    if token:
+        return token
+
+    return _read_token_from_known_files(repo_root)
 
 
 class MapillaryClient:
@@ -53,11 +109,11 @@ class MapillaryClient:
     _VECTOR_TILE_VERSION = 2
 
     def __init__(self, token: Optional[str] = None, timeout: int = 30, retries: int = 4):
-        token = token or os.getenv("MAPILLARY_TOKEN") or _read_token_from_file()
+        token = _resolve_token(token)
         if not token:
             raise RuntimeError(
-                "Mapillary token not provided. Set MAPILLARY_TOKEN, place it in "
-                "'mapillary_token', or pass token=..."
+                "Mapillary token not provided. Set MAPILLARY_TOKEN, provide MAPILLARY_TOKEN_FILE, "
+                "place it in 'mapillary_token', or pass token=..."
             )
 
         self.token = token
@@ -110,6 +166,30 @@ class MapillaryClient:
                 continue
             collected.extend(data)
         return collected
+
+    def get_thumbnail_url(self, image_id: str, resolution: int = constants.MAPILLARY_DEFAULT_IMAGE_RES) -> Optional[str]:
+        field = f"thumb_{resolution}_url"
+        data = self.get_image_meta(image_id, fields=[field])
+        return data.get(field)
+
+    def download_file(self, url: str, dest_path: Path, chunk_size: int = 1 << 20) -> None:
+        """Download an asset pointed by *url* into *dest_path*."""
+        with self.session.get(url, timeout=self.timeout, stream=True) as response:
+            response.raise_for_status()
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            with dest_path.open("wb") as fh:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        fh.write(chunk)
+
+    def download_thumbnail(self, image_id: str, dest_path: Path, resolution: int = constants.MAPILLARY_DEFAULT_IMAGE_RES, chunk_size: int = 1 << 20) -> Optional[Path]:
+        """Download thumbnail for *image_id* if available."""
+        url = self.get_thumbnail_url(image_id, resolution=resolution)
+        if not url:
+            return None
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        self.download_file(url, dest_path, chunk_size=chunk_size)
+        return dest_path
 
     def list_image_ids_in_sequence(self, seq_id: str, limit: int = 10_000) -> List[str]:
         url = f"{constants.MAPILLARY_GRAPH_URL}/images"

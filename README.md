@@ -117,6 +117,7 @@ dtm_from_mapillary/
    ```bash
    export MAPILLARY_TOKEN="YOUR_TOKEN_HERE"
    ```
+   > Alternatively place the token in `.env` (as `MAPILLARY_TOKEN=...`) or in the repository `mapillary_token` file.
 
 4. **Run the pipeline** over a bounding box (lon_min,lat_min,lon_max,lat_max):
    ```bash
@@ -139,6 +140,15 @@ dtm_from_mapillary/
      --out-dir ./out \
      --enforce-breaklines
    ```
+
+   **Optional: Prefetch Mapillary thumbnails (reduces API churn):**
+   ```bash
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out \
+     --cache-imagery \
+     --imagery-per-sequence 3
+   ```
    
    **Combined: All advanced features:**
    ```bash
@@ -147,7 +157,9 @@ dtm_from_mapillary/
      --out-dir ./out \
      --use-learned-uncertainty \
      --uncertainty-model-path ./models/uncertainty.pkl \
-     --enforce-breaklines
+     --enforce-breaklines \
+     --cache-imagery \
+     --imagery-per-sequence 3
    ```
 
 5. **Outputs** (ellipsoidal heights):
@@ -156,6 +168,7 @@ dtm_from_mapillary/
    - `out/confidence.tif`
    - `out/ground_points.laz`
    - `out/report.html`
+   - Cache root (metadata & imagery): `cache/mapillary/`
 
 ---
 

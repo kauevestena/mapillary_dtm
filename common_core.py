@@ -17,6 +17,7 @@ class FrameMeta:
     camera_type: str  # "perspective"|"fisheye"|"spherical"
     cam_params: Dict  # fx, fy, cx, cy, distortion, etc (OpenSfM-like)
     quality_score: Optional[float]
+    thumbnail_url: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to JSON-friendly dict."""
@@ -30,6 +31,7 @@ class FrameMeta:
             "camera_type": self.camera_type,
             "cam_params": self.cam_params,
             "quality_score": float(self.quality_score) if self.quality_score is not None else None,
+            "thumbnail_url": self.thumbnail_url,
         }
 
     @staticmethod
@@ -46,6 +48,7 @@ class FrameMeta:
             camera_type=str(data.get("camera_type", "unknown")),
             cam_params=dict(data.get("cam_params", {})),
             quality_score=float(data["quality_score"]) if data.get("quality_score") is not None else None,
+            thumbnail_url=data.get("thumbnail_url"),
         )
 
 @dataclass

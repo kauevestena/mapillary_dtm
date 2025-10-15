@@ -88,7 +88,14 @@ DEFAULT_FIELDS = [
     "camera_type",
     "camera_parameters",
     "quality_score",
+    "thumb_1024_url",
 ]
+
+# Mapillary cache configuration
+MAPILLARY_CACHE_ROOT = "cache/mapillary"
+MAPILLARY_METADATA_CACHE_MAX_GB = 2.0
+MAPILLARY_IMAGERY_CACHE_MAX_GB = 8.0
+MAPILLARY_DEFAULT_IMAGE_RES = 1024
 
 # sample region bbox (for testing):
 # min_lon, min_lat, max_lon, max_lat = -48.596644,-27.591363,-48.589890,-27.586780

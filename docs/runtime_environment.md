@@ -65,7 +65,7 @@ For GPU-enabled PyTorch replace the wheel specification in `requirements-optiona
 
 | Variable | Description | Required | Notes |
 | --- | --- | --- | --- |
-| `MAPILLARY_TOKEN` | OAuth token with `images:read` scope | Yes (runtime) | Alternative: place token in repo root `mapillary_token` file. |
+| `MAPILLARY_TOKEN` | OAuth token with `images:read` scope | Yes (runtime) | Alternative: define in `.env`, set `MAPILLARY_TOKEN_FILE`, or place token in repo root `mapillary_token`. |
 | `CUDA_VISIBLE_DEVICES` | GPU selection | No | Set when running GPU-accelerated stages. |
 | `DTM_CACHE_ROOT` | Override cache directory root | No | Defaults to `./cache`. |
 

@@ -9,6 +9,8 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from ..api.mapillary_client import MapillaryClient
 from ..common_core import FrameMeta
+from .. import constants
+from . import cache_utils
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ def discover_sequences(
     client: Optional[MapillaryClient] = None,
     max_sequences: Optional[int] = None,
     max_images_per_sequence: Optional[int] = None,
-    cache_dir: Optional[Path | str] = Path("cache/sequences"),
+    cache_dir: Optional[Path | str] = None,
     use_cache: bool = True,
     force_refresh: bool = False,
 ) -> Dict[str, List[FrameMeta]]:
@@ -53,9 +55,7 @@ def discover_sequences(
 
     client = client or MapillaryClient(token=token)
 
-    cache_dir_path = Path(cache_dir) if cache_dir is not None else None
-    if cache_dir_path is not None:
-        cache_dir_path.mkdir(parents=True, exist_ok=True)
+    cache_dir_path = cache_utils.metadata_cache_dir(cache_dir)
 
     seq_ids = list(client.list_sequence_ids_in_bbox(bbox))
     if max_sequences is not None:
@@ -65,8 +65,8 @@ def discover_sequences(
     sequences: Dict[str, List[FrameMeta]] = {}
     for seq_id in seq_ids:
         cached = None
-        cache_path = cache_dir_path / f"{seq_id}.jsonl" if cache_dir_path is not None else None
-        if cache_path and use_cache and cache_path.exists() and not force_refresh:
+        cache_path = cache_dir_path / f"{seq_id}.jsonl"
+        if use_cache and cache_path.exists() and not force_refresh:
             cached = _load_cache(cache_path)
             if cached:
                 sequences[seq_id] = cached
@@ -98,9 +98,11 @@ def discover_sequences(
         sequences[seq_id] = frames
         log.debug("Sequence %s → %d frames", seq_id, len(frames))
 
-        if cache_path:
-            _write_cache(cache_path, frames)
-            log.debug("Wrote cache for sequence %s to %s", seq_id, cache_path)
+        _write_cache(cache_path, frames)
+        cache_utils.enforce_quota(
+            cache_dir_path, constants.MAPILLARY_METADATA_CACHE_MAX_GB
+        )
+        log.debug("Wrote cache for sequence %s to %s", seq_id, cache_path)
 
     log.info("Retained %d sequences after bbox filtering", len(sequences))
     return sequences
@@ -128,6 +130,7 @@ def _frame_meta_from_api(meta: Mapping) -> Optional[FrameMeta]:
         cam_params = _safe_json_loads(cam_params) or {}
     if not isinstance(cam_params, Mapping):
         cam_params = {}
+    thumb_url = meta.get("thumb_1024_url") or meta.get("thumb_2048_url")
 
     return FrameMeta(
         image_id=str(image_id),
@@ -139,6 +142,7 @@ def _frame_meta_from_api(meta: Mapping) -> Optional[FrameMeta]:
         camera_type=camera_type,
         cam_params=dict(cam_params),
         quality_score=quality_score,
+        thumbnail_url=str(thumb_url) if thumb_url else None,
     )
 
 

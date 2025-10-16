@@ -28,9 +28,9 @@ This document lays out an incremental plan to bring the pipeline from the curren
 - [x] Surface configuration knobs (threads, GPU usage) via CLI flags and document defaults.
 
 ## Milestone 5 — VO + Dense Support
-- [ ] Implement the VO chain against real image streams (e.g., OpenCV-based feature tracking) and expose scale metadata to the solver.
-- [ ] Wire in mono-depth or plane-sweep modules using actual models; handle optional GPU acceleration.
-- [ ] Expand `label_and_filter_points` to consume real VO/dense outputs and tag them with uncertainty estimates.
+- [x] Implement the VO chain against real image streams (e.g., OpenCV-based feature tracking) and expose scale metadata to the solver.
+- [x] Wire in mono-depth or plane-sweep modules using actual models; handle optional GPU acceleration.
+- [x] Expand `label_and_filter_points` to consume real VO/dense outputs and tag them with uncertainty estimates.
 
 ## Milestone 6 — Metric Scale & Consensus Validation
 - [ ] Revisit `solve_scale_and_h` with real inputs; add numerical stability checks and clear error messages when constraints fail.

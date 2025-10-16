@@ -159,7 +159,25 @@ dtm_from_mapillary/
      --colmap-use-gpu
    ```
    > Defaults: `--colmap-threads 8`, `--no-colmap-use-gpu`
-   
+
+   **Optional: Disable imagery-backed VO (synthetic fallback):**
+   ```bash
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out \
+     --vo-force-synthetic
+   ```
+   > VO now consumes cached Mapillary thumbnails when available. Provide imagery via `scripts/download_sample_data.py` or the cache flags above for best results.
+
+   **Optional: Run monodepth with a real model (TorchScript):**
+   ```bash
+   MONODEPTH_MODEL_PATH=./models/midas.torchscript.pt \
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --aoi-bbox "-122.45,37.76,-122.41,37.79" \
+     --out-dir ./out
+   ```
+   > Set `MONODEPTH_DEVICE=cuda` and (optionally) `MONODEPTH_USE_GPU=1` to leverage GPUs when PyTorch is available; falls back to synthetic depth otherwise.
+
    **Combined: All advanced features:**
    ```bash
    python -m dtm_from_mapillary.cli.pipeline run \

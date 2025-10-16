@@ -39,6 +39,11 @@ RANSAC_THRESH_PX: float = 1.0
 LO_WINDOW_N: int = 5
 COLMAP_DEFAULT_THREADS: int = 8
 COLMAP_USE_GPU: bool = False
+VO_ORB_FEATURES: int = 2000
+VO_MIN_INLIERS: int = 35
+VO_RANSAC_THRESH: float = 1.0
+VO_USE_RATIO_TEST: bool = True
+VO_RATIO_TEST: float = 0.75
 
 # Height & scale
 H_MIN_M: float = 1.0

@@ -34,6 +34,11 @@ def label_and_filter_points(
     scales: Mapping[str, float],
     mask_dir: Path | str = Path("cache/masks"),
     mono_cache: Path | str = Path("cache/depth_mono"),
+    *,
+    include_sparse: bool = True,
+    include_monodepth: bool = True,
+    include_plane_sweep: bool = True,
+    vo_recon: Mapping[str, ReconstructionResult] | None = None,
 ) -> List[GroundPoint]:
     """Return ground-only point samples enriched with QA metadata."""
 
@@ -43,7 +48,10 @@ def label_and_filter_points(
     frame_index: Dict[str, Sequence[FrameMeta]] = {
         seq_id: result.frames for seq_id, result in recon.items() if result.frames
     }
-    mono_depths = predict_depths(frame_index, out_dir=mono_cache)
+    if include_monodepth:
+        mono_depths = predict_depths(frame_index, out_dir=mono_cache)
+    else:
+        mono_depths = {}
 
     mask_dir_path = Path(mask_dir)
     collected: List[GroundPoint] = []
@@ -68,31 +76,36 @@ def label_and_filter_points(
             if frame.image_id in centers
         }
         ordered_frames = [frame for frame in frames if frame.image_id in centers]
-        mono_data = mono_depths.get(seq_id, {})
+        mono_data = mono_depths.get(seq_id, {}) if include_monodepth else {}
+        vo_result = vo_recon.get(seq_id) if vo_recon else None
 
         candidates: List[Tuple[np.ndarray, float, str]] = []
 
         base_xyz = result.points_xyz if result.points_xyz is not None else np.zeros((0, 3), dtype=float)
         base_points = np.asarray(base_xyz, dtype=np.float64)
-        if base_points.size:
+        if include_sparse and base_points.size:
             for pt in base_points * scale:
                 candidates.append((pt, 0.18, result.source or "recon"))
 
-        candidates.extend(
-            _monodepth_candidates(
-                ordered_frames,
-                centers,
-                headings,
-                mono_data,
+        if include_monodepth:
+            candidates.extend(
+                _monodepth_candidates(
+                    ordered_frames,
+                    centers,
+                    headings,
+                    mono_data,
+                )
             )
-        )
-        candidates.extend(
-            _plane_sweep_candidates(
-                ordered_frames,
-                centers,
-                scale,
+        if include_plane_sweep:
+            candidates.extend(
+                _plane_sweep_candidates(
+                    ordered_frames,
+                    centers,
+                    scale,
+                )
             )
-        )
+        if vo_result is not None:
+            candidates.extend(_vo_candidates(vo_result, scale))
 
         seq_points = _evaluate_candidates(
             seq_id,
@@ -196,6 +209,54 @@ def _plane_sweep_candidates(
         for point, weight in zip(pts, weights, strict=False):
             base_uncert = 0.28 - 0.18 * float(np.clip(weight, 0.0, 1.0))
             candidates.append((point.astype(np.float64), max(0.1, base_uncert), "plane_sweep"))
+    return candidates
+
+
+def _vo_candidates(
+    vo_result: ReconstructionResult,
+    scale: float,
+) -> List[Tuple[np.ndarray, float, str]]:
+    frames = list(vo_result.frames or [])
+    if len(frames) < 2:
+        return []
+
+    positions: list[np.ndarray] = []
+    for frame in frames:
+        pose = vo_result.poses.get(frame.image_id)
+        if pose is None:
+            continue
+        positions.append(np.asarray(pose.t, dtype=np.float64) * scale)
+
+    if len(positions) < 2:
+        return []
+
+    candidates: List[Tuple[np.ndarray, float, str]] = []
+    up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+
+    for idx in range(len(positions) - 1):
+        p0 = positions[idx]
+        p1 = positions[idx + 1]
+        baseline = p1 - p0
+        length = np.linalg.norm(baseline)
+        if length < 1e-5:
+            continue
+
+        forward = baseline / length
+        lateral = np.array([-forward[1], forward[0], 0.0], dtype=np.float64)
+        if np.linalg.norm(lateral) < 1e-6:
+            lateral = np.array([0.0, 1.0, 0.0], dtype=np.float64)
+        lateral /= np.linalg.norm(lateral)
+
+        alphas = np.linspace(0.1, 0.9, 4, dtype=np.float64)
+        offsets = np.array([-1.5, -0.5, 0.5, 1.5], dtype=np.float64)
+        base_uncert = 0.35 + 0.1 * (1.0 - np.clip(length / 8.0, 0.0, 1.0))
+
+        for alpha in alphas:
+            center = (1.0 - alpha) * p0 + alpha * p1
+            for offset in offsets:
+                point = center + lateral * float(offset) - up * ASSUMED_CAM_HEIGHT
+                candidates.append((point.astype(np.float64), float(base_uncert), "vo"))
+
     return candidates
 
 

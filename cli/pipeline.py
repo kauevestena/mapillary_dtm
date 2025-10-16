@@ -64,6 +64,8 @@ def run_pipeline(
     imagery_per_sequence: int = 5,
     colmap_threads: int = constants.COLMAP_DEFAULT_THREADS,
     colmap_use_gpu: bool = constants.COLMAP_USE_GPU,
+    vo_force_synthetic: bool = False,
+    vo_min_inliers: Optional[int] = None,
 ) -> dict:
     """
     Run the full pipeline over an AOI bbox: "lon_min,lat_min,lon_max,lat_max".
@@ -91,6 +93,10 @@ def run_pipeline(
         Thread budget for COLMAP feature extraction / reconstruction.
     colmap_use_gpu : bool
         Enable COLMAP GPU paths (requires CUDA build).
+    vo_force_synthetic : bool
+        Force the legacy synthetic VO path (skip OpenCV pipeline).
+    vo_min_inliers : int, optional
+        Minimum essential-matrix inliers required per frame pair.
     """
     os.makedirs(out_dir, exist_ok=True)
     bbox = tuple(map(float, aoi_bbox.split(",")))
@@ -119,15 +125,25 @@ def run_pipeline(
         threads=colmap_threads,
         use_gpu=colmap_use_gpu,
     )
-    vo = run_vo(seqs)
+    vo = run_vo(
+        seqs,
+        force_synthetic=vo_force_synthetic,
+        min_inliers=vo_min_inliers,
+    )
 
     anchors = find_anchors(seqs, token=token)
     scales, heights = solve_scale_and_h(reconA, reconB, vo, anchors, seqs)
 
-    ptsA = label_and_filter_points(reconA, scales)
-    ptsB = label_and_filter_points(reconB, scales)
-    # Placeholder for VO+mono-derived ground points
-    ptsC: list = []
+    ptsA = label_and_filter_points(reconA, scales, vo_recon=vo)
+    ptsB = label_and_filter_points(reconB, scales, vo_recon=vo)
+    ptsC = label_and_filter_points(
+        vo,
+        scales,
+        include_sparse=False,
+        include_monodepth=False,
+        include_plane_sweep=False,
+        vo_recon=vo,
+    )
 
     # Apply learned uncertainty calibration if requested
     if use_learned_uncertainty:
@@ -299,7 +315,13 @@ def run_pipeline(
             "colmap": {
                 "threads": colmap_threads,
                 "use_gpu": colmap_use_gpu,
-            }
+            },
+            "vo": {
+                "force_synthetic": vo_force_synthetic,
+                "min_inliers": int(vo_min_inliers)
+                if vo_min_inliers is not None
+                else constants.VO_MIN_INLIERS,
+            },
         },
         "breaklines": breakline_stats,
         "outputs": {
@@ -353,6 +375,14 @@ if typer is not None:
             constants.COLMAP_USE_GPU,
             help="Enable COLMAP GPU paths (requires CUDA-enabled build).",
         ),
+        vo_force_synthetic: bool = typer.Option(
+            False,
+            help="Force the legacy synthetic VO path (skip imagery-backed VO).",
+        ),
+        vo_min_inliers: Optional[int] = typer.Option(
+            None,
+            help="Minimum VO inliers required per frame pair (default: constants.VO_MIN_INLIERS).",
+        ),
     ) -> None:
         """Run the DTM generation pipeline.
 
@@ -378,6 +408,10 @@ if typer is not None:
             Thread budget for COLMAP feature extraction / reconstruction
         colmap_use_gpu : bool
             Enable COLMAP GPU pipelines (requires CUDA build)
+        vo_force_synthetic : bool
+            Force the synthetic VO fallback path
+        vo_min_inliers : int, optional
+            Minimum VO inliers per frame pair
         """
         run_pipeline(
             aoi_bbox=aoi_bbox,
@@ -390,6 +424,8 @@ if typer is not None:
             imagery_per_sequence=imagery_per_sequence,
             colmap_threads=colmap_threads,
             colmap_use_gpu=colmap_use_gpu,
+            vo_force_synthetic=vo_force_synthetic,
+            vo_min_inliers=vo_min_inliers,
         )
 
 else:  # pragma: no cover - only executed when typer missing

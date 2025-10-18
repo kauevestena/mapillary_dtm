@@ -15,7 +15,7 @@ opencv-python
 scikit-image
 laspy[lazrs]
 matplotlib
-mapillary
+wget
 triangle       # Constrained Delaunay triangulation for breakline enforcement
 
 # Optional / heavyweight extras:

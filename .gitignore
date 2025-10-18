@@ -178,6 +178,7 @@ qa/data/*
 !qa/data/sample_anchors.json
 !qa/data/sample_scale_solution.json
 !qa/data/colmap_fixture/
+!qa/data/consensus_fixture/
 !qa/data/colmap_fixture/**
 
 # big files:

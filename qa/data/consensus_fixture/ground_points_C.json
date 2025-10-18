@@ -1,0 +1,38 @@
+[
+  {
+    "x": 100.2,
+    "y": 100.2,
+    "z": 10.1,
+    "sem_prob": 0.88,
+    "uncertainty_m": 0.12,
+    "tri_angle_deg": 44.0,
+    "source": "C"
+  },
+  {
+    "x": 102.2,
+    "y": 100.2,
+    "z": 10.2,
+    "sem_prob": 0.84,
+    "uncertainty_m": 0.16,
+    "tri_angle_deg": 40.0,
+    "source": "C"
+  },
+  {
+    "x": 200.2,
+    "y": 200.2,
+    "z": 15.2,
+    "sem_prob": 0.93,
+    "uncertainty_m": 0.07,
+    "tri_angle_deg": 52.0,
+    "source": "C"
+  },
+  {
+    "x": 300.1,
+    "y": 300.1,
+    "z": 20.5,
+    "sem_prob": 0.75,
+    "uncertainty_m": 0.25,
+    "tri_angle_deg": 38.0,
+    "source": "C"
+  }
+]

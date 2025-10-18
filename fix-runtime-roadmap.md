@@ -37,7 +37,7 @@ This document lays out an incremental plan to bring the pipeline from the curren
 - [x] Write integration tests around consensus voting using captured fixture datasets (store lightweight subsets under `qa/data/`). _See `tests/test_consensus_integration.py`, `qa/data/consensus_fixture/`._
 - [x] Document expected failure modes (insufficient overlap, GPS gaps) and how the pipeline responds. _See `docs/MILESTONE_6_FAILURE_MODES.md`._
 
-## Milestone 7 — Breaklines & TIN Enforcement
+## Milestone 7 — Breaklines & TIN Enforcement **← Current Milestone**
 - [ ] Validate curb extraction and 3D projection using real detections; add visualization/debug utilities to inspect results quickly.
 - [ ] Ensure constrained TIN builds succeed with real breakline data, and add tests to guard against regressions.
 - [ ] Tune parameters (`BREAKLINE_*`, `MAX_TIN_EXTRAPOLATION_M`) based on empirical runs and record guidance in docs.

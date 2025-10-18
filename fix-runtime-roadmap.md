@@ -33,9 +33,9 @@ This document lays out an incremental plan to bring the pipeline from the curren
 - [x] Expand `label_and_filter_points` to consume real VO/dense outputs and tag them with uncertainty estimates.
 
 ## Milestone 6 — Metric Scale & Consensus Validation
-- [ ] Revisit `solve_scale_and_h` with real inputs; add numerical stability checks and clear error messages when constraints fail.
-- [ ] Write integration tests around consensus voting using captured fixture datasets (store lightweight subsets under `qa/data/`).
-- [ ] Document expected failure modes (insufficient overlap, GPS gaps) and how the pipeline responds.
+- [x] Revisit `solve_scale_and_h` with real inputs; add numerical stability checks and clear error messages when constraints fail. _See `geom/height_solver.py` enhanced logging and error handling._
+- [x] Write integration tests around consensus voting using captured fixture datasets (store lightweight subsets under `qa/data/`). _See `tests/test_consensus_integration.py`, `qa/data/consensus_fixture/`._
+- [x] Document expected failure modes (insufficient overlap, GPS gaps) and how the pipeline responds. _See `docs/MILESTONE_6_FAILURE_MODES.md`._
 
 ## Milestone 7 — Breaklines & TIN Enforcement
 - [ ] Validate curb extraction and 3D projection using real detections; add visualization/debug utilities to inspect results quickly.

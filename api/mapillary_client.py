@@ -226,13 +226,111 @@ class MapillaryClient:
             tiles = bbox_to_z14_tiles(tuple(bbox))
         except Exception as exc:  # pragma: no cover - defensive, bbox validated upstream
             raise ValueError(f"Invalid bbox {bbox}: {exc}")
+        saw_tile_error = False
         for z, x, y in tiles:
             try:
                 tile_bytes = self.get_vector_tile("sequences", z, x, y)
             except requests.HTTPError as exc:  # pragma: no cover - network errors hard to test
                 log.warning("Failed to fetch vector tile %s/%s/%s: %s", z, x, y, exc)
+                saw_tile_error = True
                 continue
-            seq_ids.update(self._extract_sequence_ids(tile_bytes))
+            extracted = self._extract_sequence_ids(tile_bytes)
+            if extracted:
+                seq_ids.update(extracted)
+        if seq_ids:
+            return seq_ids
+
+        if saw_tile_error:
+            log.info("Falling back to Mapillary Graph API search for sequences")
+        fallback_ids = self._list_sequence_ids_via_graph_api(bbox)
+        if fallback_ids:
+            seq_ids.update(fallback_ids)
+        return seq_ids
+
+    def list_images_in_bbox(self, bbox: Sequence[float], limit: int = 2_000) -> List[Dict]:
+        """Fetch image metadata inside *bbox* directly via Graph API."""
+        lon_min, lat_min, lon_max, lat_max = map(float, bbox)
+        params = {
+            "bbox": f"{lon_min},{lat_min},{lon_max},{lat_max}",
+            "fields": ",".join(
+                {
+                    "id",
+                    "sequence_id",
+                    "sequence{id}",
+                    "geometry",
+                    "captured_at",
+                    "camera_type",
+                    "camera_parameters",
+                    "quality_score",
+                    "thumb_1024_url",
+                }
+            ),
+            "limit": min(limit, 200),
+        }
+        url = f"{constants.MAPILLARY_GRAPH_URL}/images"
+        collected: List[Dict] = []
+        while url and len(collected) < limit:
+            try:
+                resp = self._get(url, params=params)
+            except requests.HTTPError as exc:
+                log.warning("Graph API bbox image fetch failed for %s: %s", bbox, exc)
+                break
+
+            params = None  # only used on the first request
+            payload = resp.json() if resp.content else {}
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if isinstance(data, list):
+                collected.extend(item for item in data if isinstance(item, dict))
+
+            paging = payload.get("paging") if isinstance(payload, dict) else None
+            if isinstance(paging, dict):
+                next_url = paging.get("next")
+                url = next_url if next_url else None
+            else:
+                break
+
+        if len(collected) > limit:
+            collected = collected[:limit]
+        return collected
+
+    def _list_sequence_ids_via_graph_api(self, bbox: Sequence[float]) -> Set[str]:
+        """Fallback path: query Graph API directly for images in the bbox."""
+        lon_min, lat_min, lon_max, lat_max = map(float, bbox)
+        params = {
+            "bbox": f"{lon_min},{lat_min},{lon_max},{lat_max}",
+            "fields": "id,sequence{id}",
+            "limit": 200,
+        }
+        url = f"{constants.MAPILLARY_GRAPH_URL}/images"
+        seq_ids: Set[str] = set()
+
+        while url:
+            try:
+                resp = self._get(url, params=params)
+            except requests.HTTPError as exc:
+                log.warning("Graph API fallback failed for bbox %s: %s", bbox, exc)
+                break
+
+            params = None  # only used on the first request
+            payload = resp.json() if resp.content else {}
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if isinstance(data, list):
+                for item in data:
+                    seq = None
+                    if isinstance(item, dict):
+                        seq = item.get("sequence") or item.get("sequence_id")
+                        if isinstance(seq, dict):
+                            seq = seq.get("id")
+                    if seq:
+                        seq_ids.add(str(seq))
+
+            paging = payload.get("paging") if isinstance(payload, dict) else None
+            if isinstance(paging, dict):
+                next_url = paging.get("next")
+                url = next_url if next_url else None
+            else:
+                break
+
         return seq_ids
 
     @staticmethod

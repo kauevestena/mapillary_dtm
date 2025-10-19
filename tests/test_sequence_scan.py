@@ -66,6 +66,9 @@ class DummyClient:
         }
         return [payloads[i] for i in image_ids]
 
+    def list_images_in_bbox(self, bbox, limit=2000):
+        return []
+
 
 def test_discover_sequences_filters_bbox_and_sequence(tmp_path):
     client = DummyClient()

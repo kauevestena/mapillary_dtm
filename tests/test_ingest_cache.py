@@ -50,6 +50,9 @@ class _SequenceClient:
             )
         return records
 
+    def list_images_in_bbox(self, bbox: Sequence[float], limit: int = 2_000) -> List[Dict]:
+        return []
+
 
 class _ImageryClient:
     def __init__(self):

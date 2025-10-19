@@ -105,6 +105,25 @@ def discover_sequences(
         log.debug("Wrote cache for sequence %s to %s", seq_id, cache_path)
 
     log.info("Retained %d sequences after bbox filtering", len(sequences))
+    if sequences:
+        return sequences
+
+    log.info("No per-sequence frames found; falling back to bbox image scan")
+    fallback_metas = client.list_images_in_bbox(bbox)
+    if not fallback_metas:
+        return sequences
+
+    for meta in fallback_metas:
+        frame = _frame_meta_from_api(meta)
+        if frame is None:
+            continue
+        if not _within_bbox(frame.lon, frame.lat, bbox):
+            continue
+        sequences.setdefault(frame.seq_id, []).append(frame)
+
+    for frames in sequences.values():
+        frames.sort(key=lambda f: f.captured_at_ms)
+
     return sequences
 
 

@@ -10,9 +10,9 @@ Custom wrapper around the Mapillary Graph API v4. This is the primary client use
 - Querying sequences
 - Vector tile operations
 
-## my_mapillary_api.py
+## my_mapillary_api (submodule)
 
-Alternative Mapillary API helper from [kauevestena/my_mappilary_api](https://github.com/kauevestena/my_mappilary_api.git).
+Alternative Mapillary API helper vendored via git submodule from [kauevestena/my_mappilary_api](https://github.com/kauevestena/my_mappilary_api.git).
 
 This module provides a GeoDataFrame-centric approach to working with Mapillary data:
 - Direct GeoDataFrame conversion
@@ -43,8 +43,8 @@ The official `mapillary` Python SDK has been replaced with the custom API implem
 ### What Changed
 
 1. Removed `mapillary` package dependency from `requirements.txt`
-2. Added `wget` dependency (required by `my_mapillary_api.py`)
-3. Integrated `my_mapillary_api.py` from the custom repository
+2. Added `wget` dependency (required by the `my_mapillary_api` submodule)
+3. Integrated `my_mapillary_api` from the custom repository as a git submodule
 4. Added this documentation
 
 ### No Code Changes Required

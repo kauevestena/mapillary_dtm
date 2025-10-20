@@ -12,9 +12,11 @@ import json
 import logging
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+import requests
 
 # Set up Python path if not already done
 _project_root = Path(__file__).resolve().parent.parent
@@ -25,11 +27,14 @@ os.chdir(str(_project_root))
 # Import project modules - must import the package properly
 import dtm_from_mapillary
 from dtm_from_mapillary import constants
-from dtm_from_mapillary.api.mapillary_client import MapillaryClient
-from dtm_from_mapillary.ingest.sequence_scan import discover_sequences
-from dtm_from_mapillary.ingest.sequence_filter import filter_car_sequences
-from dtm_from_mapillary.ingest.imagery_cache import prefetch_imagery
 from dtm_from_mapillary.common_core import FrameMeta
+from dtm_from_mapillary.ingest.sequence_filter import filter_car_sequences
+
+_mapillary_api_dir = _project_root / "api" / "my_mapillary_api"
+if str(_mapillary_api_dir) not in sys.path:
+    sys.path.insert(0, str(_mapillary_api_dir))
+
+import mapillary_api  # type: ignore[import]
 
 # Get default bbox from constants
 DEFAULT_BBOX = constants.bbox
@@ -38,6 +43,197 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 log = logging.getLogger(__name__)
+
+
+def resolve_token(explicit: Optional[str]) -> str:
+    """Resolve Mapillary token from CLI, env vars, or token file."""
+    if explicit and explicit.strip():
+        return explicit.strip()
+
+    env_token = os.getenv("MAPILLARY_TOKEN")
+    if env_token and env_token.strip():
+        return env_token.strip()
+
+    token = mapillary_api.get_mapillary_token()
+    if token and token.strip():
+        return token.strip()
+
+    raise RuntimeError(
+        "Mapillary token not provided. "
+        "Use --token, export MAPILLARY_TOKEN, or create a mapillary_token file."
+    )
+
+
+def fetch_metadata_gdf(bbox: Dict[str, float], token: str, limit: Optional[int] = None):
+    """Fetch Mapillary metadata within *bbox* using the simple demo logic."""
+    max_items = limit or 5000
+    data = mapillary_api.get_mapillary_images_metadata(
+        bbox["min_lon"],
+        bbox["min_lat"],
+        bbox["max_lon"],
+        bbox["max_lat"],
+        token=token,
+        limit=max_items,
+    )
+    return mapillary_api.mapillary_data_to_gdf(data)
+
+
+def _captured_at_to_ms(raw) -> int:
+    if raw is None:
+        return 0
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    if isinstance(raw, str) and raw:
+        try:
+            if raw.endswith("Z"):
+                raw_dt = raw[:-1] + "+00:00"
+            else:
+                raw_dt = raw
+            dt = datetime.fromisoformat(raw_dt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return int(dt.timestamp() * 1000.0)
+        except ValueError:
+            return 0
+    return 0
+
+
+def _safe_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_cam_params(raw) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str) and raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+
+def gdf_to_sequences(
+    gdf, max_sequences: Optional[int] = None
+) -> Dict[str, List[FrameMeta]]:
+    """Convert GeoDataFrame rows to FrameMeta grouped by sequence."""
+    if gdf is None or gdf.empty:
+        return {}
+
+    sequences: Dict[str, List[FrameMeta]] = {}
+    seq_count = 0
+
+    for row in gdf.itertuples(index=False):
+        seq_id = getattr(row, "sequence", None)
+        if not seq_id:
+            continue
+        if max_sequences is not None and seq_id not in sequences:
+            if seq_count >= max_sequences:
+                continue
+            seq_count += 1
+
+        geom = getattr(row, "geometry", None)
+        lon = getattr(geom, "x", None) if geom is not None else None
+        lat = getattr(geom, "y", None) if geom is not None else None
+        if lon is None or lat is None:
+            continue
+
+        image_id = getattr(row, "id", None)
+        if image_id is None:
+            continue
+
+        frame = FrameMeta(
+            image_id=str(image_id),
+            seq_id=str(seq_id),
+            captured_at_ms=_captured_at_to_ms(getattr(row, "captured_at", None)),
+            lon=float(lon),
+            lat=float(lat),
+            alt_ellip=_safe_float(getattr(row, "altitude", None)),
+            camera_type=str(getattr(row, "camera_type", "unknown") or "unknown"),
+            cam_params=_parse_cam_params(getattr(row, "camera_parameters", {})),
+            quality_score=_safe_float(getattr(row, "quality_score", None)),
+            thumbnail_url=getattr(row, "thumb_original_url", None),
+        )
+
+        sequences.setdefault(frame.seq_id, []).append(frame)
+
+    for frames in sequences.values():
+        frames.sort(key=lambda f: f.captured_at_ms)
+
+    return sequences
+
+
+def write_raw_metadata(gdf, out_path: Path) -> None:
+    """Persist raw metadata to disk for inspection."""
+    if gdf is None or gdf.empty:
+        return
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        gdf.to_file(out_path, driver="GeoJSON")
+        log.info("✓ Wrote raw metadata to %s", out_path)
+    except Exception as exc:  # geopandas might not be available with fiona
+        log.warning("Failed to write GeoJSON metadata (%s). Writing CSV fallback.", exc)
+        try:
+            gdf.to_csv(out_path.with_suffix(".csv"), index=False)
+            log.info("✓ Wrote raw metadata CSV to %s", out_path.with_suffix(".csv"))
+        except Exception as csv_exc:
+            log.warning("Failed to write metadata CSV: %s", csv_exc)
+
+
+def _download_bytes(url: str, dest_path: Path) -> None:
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    with dest_path.open("wb") as fh:
+        fh.write(response.content)
+
+
+def download_imagery_for_sequences(
+    gdf, base_dir: Path, per_sequence: int
+) -> Dict[str, int]:
+    """Download thumbnails for each sequence limited by *per_sequence*."""
+    if per_sequence <= 0 or gdf is None or gdf.empty:
+        return {}
+
+    stats: Dict[str, int] = {}
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    if "sequence" not in gdf.columns:
+        log.warning("Metadata is missing 'sequence' column; skipping imagery download.")
+        return stats
+
+    grouped = gdf.groupby("sequence")
+    for seq_id, group in grouped:
+        if not seq_id:
+            continue
+        downloaded = 0
+        for row in group.head(per_sequence).itertuples(index=False):
+            url = getattr(row, "thumb_original_url", None)
+            image_id = getattr(row, "id", None)
+            if not url or image_id is None:
+                continue
+            dest_path = base_dir / str(seq_id) / f"{image_id}.jpg"
+            if dest_path.exists():
+                downloaded += 1
+                continue
+            try:
+                _download_bytes(url, dest_path)
+                downloaded += 1
+            except requests.HTTPError as exc:
+                log.warning("Failed to download thumbnail for %s: %s", image_id, exc)
+            except Exception as exc:
+                log.warning("Unexpected error downloading %s: %s", image_id, exc)
+        if downloaded:
+            stats[str(seq_id)] = downloaded
+
+    return stats
 
 
 def create_directory_structure(base_dir: Path) -> None:
@@ -217,17 +413,18 @@ def create_config_json(
     log.info("✓ Created config.json")
 
 
-def save_sequence_stats(
+def save_filtered_sequences(
     base_dir: Path,
-    sequences: Dict[str, List[FrameMeta]],
-    filtered_sequences: Dict[str, List[FrameMeta]],
-) -> None:
-    """Save sequence statistics to JSON."""
-
+    filtered_sequences: dict[str, list],
+    total_sequences: int,
+    total_images: int,
+    speed_stats: dict[str, dict] | None = None,
+):
+    """Save filtered sequences metadata with speed statistics"""
     stats = {
-        "total_sequences_discovered": len(sequences),
+        "total_sequences_discovered": total_sequences,
         "car_only_sequences": len(filtered_sequences),
-        "total_images": sum(len(frames) for frames in sequences.values()),
+        "total_images": total_images,
         "car_images": sum(len(frames) for frames in filtered_sequences.values()),
         "sequence_details": {},
     }
@@ -235,7 +432,7 @@ def save_sequence_stats(
     for seq_id, frames in filtered_sequences.items():
         if not frames:
             continue
-        stats["sequence_details"][seq_id] = {
+        detail = {
             "frame_count": len(frames),
             "first_captured": frames[0].captured_at_ms,
             "last_captured": frames[-1].captured_at_ms,
@@ -243,6 +440,17 @@ def save_sequence_stats(
                 frames[0].camera_type if frames[0].camera_type else "unknown"
             ),
         }
+
+        # Add speed statistics if available
+        if speed_stats and seq_id in speed_stats:
+            speed_stat = speed_stats[seq_id]
+            # Convert NamedTuple to dict if needed
+            if hasattr(speed_stat, "_asdict"):
+                detail["speed_statistics_kmh"] = speed_stat._asdict()
+            else:
+                detail["speed_statistics_kmh"] = speed_stat
+
+        stats["sequence_details"][seq_id] = detail
 
     with open(base_dir / "sequences" / "filtered_sequences.json", "w") as f:
         json.dump(stats, f, indent=2)
@@ -267,6 +475,12 @@ Examples:
   
   # Force refresh (ignore cache)
   python scripts/download_sample_data.py --force-refresh
+
+  # Limit total images retrieved
+  python scripts/download_sample_data.py --max-images 2000
+  
+  # Custom speed filtering
+  python scripts/download_sample_data.py --min-speed-kmh 30 --max-speed-kmh 100
 
 Environment:
   MAPILLARY_TOKEN    Required. Your Mapillary API token.
@@ -296,7 +510,6 @@ Environment:
     parser.add_argument(
         "--images-per-sequence",
         type=int,
-        default=5,
         help="Maximum thumbnails to cache per sequence (default: 5)",
     )
 
@@ -307,6 +520,12 @@ Environment:
     )
 
     parser.add_argument(
+        "--max-images",
+        type=int,
+        help="Maximum number of images to request from Mapillary (default: 5000)",
+    )
+
+    parser.add_argument(
         "--force-refresh",
         action="store_true",
         help="Force refresh (ignore cached metadata)",
@@ -314,6 +533,20 @@ Environment:
 
     parser.add_argument(
         "--token", help="Mapillary API token (or set MAPILLARY_TOKEN env var)"
+    )
+
+    parser.add_argument(
+        "--min-speed-kmh",
+        type=float,
+        default=40.0,
+        help="Minimum max-speed threshold for car sequences (default: 40 km/h)",
+    )
+
+    parser.add_argument(
+        "--max-speed-kmh",
+        type=float,
+        default=120.0,
+        help="Maximum max-speed threshold for car sequences (default: 120 km/h)",
     )
 
     args = parser.parse_args()
@@ -350,6 +583,9 @@ Environment:
     print(f"Bounding box: {bbox_str}")
     print(f"Output directory: {args.output_dir}")
     print(f"Cache imagery: {'Yes' if args.cache_imagery else 'No'}")
+    print(f"Speed filter: {args.min_speed_kmh}-{args.max_speed_kmh} km/h (max-speed)")
+    if args.max_images:
+        print(f"Max images: {args.max_images}")
     if args.max_sequences:
         print(f"Max sequences: {args.max_sequences}")
     print("=" * 70)
@@ -359,79 +595,140 @@ Environment:
     create_directory_structure(args.output_dir)
     print()
 
-    # Initialize Mapillary client
+    if args.force_refresh:
+        log.info("--force-refresh flag acknowledged (no cache retained in this mode).")
+
     try:
-        log.info("Initializing Mapillary client...")
-        client = MapillaryClient(token=args.token)
-        log.info("✓ Mapillary client initialized")
-    except RuntimeError as e:
-        log.error(f"Failed to initialize Mapillary client: {e}")
+        token = resolve_token(args.token)
+    except RuntimeError as exc:
+        log.error(str(exc))
         print("\n❌ Error: Mapillary token not found!")
-        print("Set MAPILLARY_TOKEN environment variable or use --token flag")
-        print("Get a token at: https://www.mapillary.com/dashboard/developers")
+        print(
+            "Set MAPILLARY_TOKEN environment variable, use API_TOKEN, or supply --token"
+        )
         sys.exit(1)
 
     print()
 
-    # Discover sequences
+    # Fetch metadata using simple demo logic
     try:
-        log.info("Discovering sequences in bounding box...")
-        sequences = discover_sequences(
-            aoi_bbox=bbox_tuple,
-            client=client,
-            max_sequences=args.max_sequences,
-            use_cache=not args.force_refresh,
-            force_refresh=args.force_refresh,
-        )
-        log.info(f"✓ Discovered {len(sequences)} sequences")
-
-        if not sequences:
-            log.warning("⚠️  No sequences found in this area!")
-            log.warning("Check Mapillary coverage: https://www.mapillary.com/app/")
-            print("\n" + "=" * 70)
-            print("No sequences found. Try:")
-            print("  1. Expanding the bounding box")
-            print("  2. Checking coverage at https://www.mapillary.com/app/")
-            print("  3. Using a different area")
-            print("=" * 70)
-            sys.exit(1)
-
-    except Exception as e:
-        log.error(f"Failed to discover sequences: {e}", exc_info=True)
+        log.info("Requesting image metadata via Mapillary Graph API...")
+        gdf = fetch_metadata_gdf(bbox_dict, token, limit=args.max_images)
+    except Exception as exc:
+        log.error("Failed to retrieve metadata: %s", exc, exc_info=True)
         sys.exit(1)
+
+    if gdf is None or gdf.empty:
+        log.warning("⚠️  No imagery found in this area.")
+        print("\n" + "=" * 70)
+        print("No imagery found. Try:")
+        print("  1. Expanding the bounding box")
+        print("  2. Checking coverage at https://www.mapillary.com/app/")
+        print("  3. Using a different area")
+        print("=" * 70)
+        sys.exit(1)
+
+    log.info("✓ Retrieved %d images from Mapillary", len(gdf))
+    metadata_path = args.output_dir / "sequences" / "metadata.geojson"
+    write_raw_metadata(gdf, metadata_path)
+
+    sequences = gdf_to_sequences(gdf, max_sequences=args.max_sequences)
+    if not sequences:
+        log.warning("⚠️  No valid sequences could be assembled from metadata.")
+        sys.exit(1)
+
+    log.info("✓ Assembled %d sequences from metadata", len(sequences))
 
     print()
 
     # Filter to car-only sequences
     try:
-        log.info("Filtering car-only sequences (40-120 km/h speed analysis)...")
-        filtered_sequences = filter_car_sequences(sequences)
+        log.info(
+            f"Filtering car-only sequences ({args.min_speed_kmh}-{args.max_speed_kmh} km/h max-speed analysis)..."
+        )
+        filtered_sequences, speed_stats = filter_car_sequences(
+            sequences,
+            min_speed_kmh=args.min_speed_kmh,
+            max_speed_kmh=args.max_speed_kmh,
+            return_statistics=True,
+        )
         log.info(f"✓ Retained {len(filtered_sequences)} car-only sequences")
+
+        # Display detailed speed statistics per sequence
+        if speed_stats:
+            print()
+            print("=" * 100)
+            print("Speed Statistics Per Sequence (km/h)")
+            print("=" * 100)
+            print(
+                f"{'Seq ID':<20} {'Status':<10} {'Min':>7} {'Q1':>7} {'Median':>7} {'Q3':>7} {'Max':>7} {'Mean':>7} {'Std':>7} {'N':>5}"
+            )
+            print("-" * 100)
+
+            for seq_id in sorted(sequences.keys()):
+                if seq_id in speed_stats:
+                    stats = speed_stats[seq_id]
+                    status = "✓ KEPT" if seq_id in filtered_sequences else "✗ REJECT"
+                    print(
+                        f"{seq_id:<20} {status:<10} "
+                        f"{stats.min_kmh:>7.1f} {stats.q1_kmh:>7.1f} {stats.median_kmh:>7.1f} "
+                        f"{stats.q3_kmh:>7.1f} {stats.max_kmh:>7.1f} {stats.mean_kmh:>7.1f} "
+                        f"{stats.std_kmh:>7.1f} {stats.sample_count:>5}"
+                    )
+                else:
+                    status = "✗ NO DATA"
+                    print(f"{seq_id:<20} {status:<10} {'N/A'}")
+
+            print("=" * 100)
+            print(
+                f"Filter criteria: max_speed must be between {args.min_speed_kmh}-{args.max_speed_kmh} km/h"
+            )
+            print(f"Sequences kept: {len(filtered_sequences)}/{len(sequences)}")
+            print("=" * 100)
 
         if not filtered_sequences:
             log.warning("⚠️  No car sequences found after filtering!")
             log.warning("This area may only have pedestrian/bike imagery")
+            log.warning(
+                f"Try adjusting speed thresholds (current: {args.min_speed_kmh}-{args.max_speed_kmh} km/h)"
+            )
     except Exception as e:
         log.error(f"Failed to filter sequences: {e}", exc_info=True)
         filtered_sequences = sequences  # Fallback to all sequences
+        speed_stats = {}
 
     print()
 
-    # Save sequence statistics
+    # Save sequence statistics with speed data
     try:
-        save_sequence_stats(args.output_dir, sequences, filtered_sequences)
+        total_images = sum(len(frames) for frames in sequences.values())
+        save_filtered_sequences(
+            args.output_dir,
+            filtered_sequences,
+            len(sequences),
+            total_images,
+            speed_stats if speed_stats else None,
+        )
     except Exception as e:
         log.warning(f"Failed to save sequence stats: {e}")
 
     # Cache imagery if requested
     cached_images = 0
-    if args.cache_imagery and filtered_sequences:
+    if args.cache_imagery:
         try:
             log.info(f"Caching up to {args.images_per_sequence} images per sequence...")
-            cache_stats = prefetch_imagery(
-                filtered_sequences,
-                client=client,
-                max_per_sequence=args.images_per_sequence,
+            target_seq_ids = (
+                set(filtered_sequences.keys())
+                if filtered_sequences
+                else set(sequences.keys())
+            )
+            imagery_gdf = (
+                gdf[gdf["sequence"].isin(target_seq_ids)]
+                if "sequence" in gdf.columns and target_seq_ids
+                else gdf
+            )
+            cache_stats = download_imagery_for_sequences(
+                imagery_gdf, args.output_dir / "imagery", args.images_per_sequence
             )
             cached_images = sum(cache_stats.values()) if cache_stats else 0
             log.info(f"✓ Cached {cached_images} thumbnail images")

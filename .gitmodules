@@ -1,0 +1,3 @@
+[submodule "api/my_mapillary_api"]
+	path = api/my_mapillary_api
+	url = https://github.com/kauevestena/my_mappilary_api.git

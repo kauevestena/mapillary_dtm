@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import requests
+from tqdm import tqdm
 
 # Set up Python path if not already done
 _project_root = Path(__file__).resolve().parent.parent
@@ -196,10 +197,24 @@ def _download_bytes(url: str, dest_path: Path) -> None:
 
 
 def download_imagery_for_sequences(
-    gdf, base_dir: Path, per_sequence: int
+    gdf, base_dir: Path, per_sequence: int | None
 ) -> Dict[str, int]:
-    """Download thumbnails for each sequence limited by *per_sequence*."""
-    if per_sequence <= 0 or gdf is None or gdf.empty:
+    """
+    Download thumbnails for each sequence with global progress tracking.
+
+    Args:
+        gdf: GeoDataFrame with image metadata
+        base_dir: Directory to save images
+        per_sequence: Max images per sequence (None = all images)
+
+    Returns:
+        Dictionary mapping sequence_id to number of downloaded images
+    """
+    if gdf is None or gdf.empty:
+        return {}
+
+    # If per_sequence is 0 or negative, download nothing
+    if per_sequence is not None and per_sequence <= 0:
         return {}
 
     stats: Dict[str, int] = {}
@@ -209,29 +224,87 @@ def download_imagery_for_sequences(
         log.warning("Metadata is missing 'sequence' column; skipping imagery download.")
         return stats
 
+    # Calculate total number of images to download
     grouped = gdf.groupby("sequence")
+    total_images = 0
+    images_already_cached = 0
+
     for seq_id, group in grouped:
         if not seq_id:
             continue
-        downloaded = 0
-        for row in group.head(per_sequence).itertuples(index=False):
+        images_to_download = group if per_sequence is None else group.head(per_sequence)
+
+        for row in images_to_download.itertuples(index=False):
             url = getattr(row, "thumb_original_url", None)
             image_id = getattr(row, "id", None)
             if not url or image_id is None:
                 continue
             dest_path = base_dir / str(seq_id) / f"{image_id}.jpg"
             if dest_path.exists():
-                downloaded += 1
+                images_already_cached += 1
+            else:
+                total_images += 1
+
+    if images_already_cached > 0:
+        log.info(f"Found {images_already_cached} already cached images (skipping)")
+
+    if total_images == 0:
+        log.info("All images already cached!")
+        # Count existing images for stats
+        for seq_id, group in grouped:
+            if not seq_id:
                 continue
-            try:
-                _download_bytes(url, dest_path)
-                downloaded += 1
-            except requests.HTTPError as exc:
-                log.warning("Failed to download thumbnail for %s: %s", image_id, exc)
-            except Exception as exc:
-                log.warning("Unexpected error downloading %s: %s", image_id, exc)
-        if downloaded:
-            stats[str(seq_id)] = downloaded
+            images_to_count = (
+                group if per_sequence is None else group.head(per_sequence)
+            )
+            count = 0
+            for row in images_to_count.itertuples(index=False):
+                image_id = getattr(row, "id", None)
+                if image_id:
+                    dest_path = base_dir / str(seq_id) / f"{image_id}.jpg"
+                    if dest_path.exists():
+                        count += 1
+            if count > 0:
+                stats[str(seq_id)] = count
+        return stats
+
+    log.info(f"Downloading {total_images} images...")
+
+    # Download with global progress bar
+    with tqdm(total=total_images, desc="Downloading images", unit="img") as pbar:
+        for seq_id, group in grouped:
+            if not seq_id:
+                continue
+            downloaded = 0
+
+            # Select images: either all or limited by per_sequence
+            images_to_download = (
+                group if per_sequence is None else group.head(per_sequence)
+            )
+
+            for row in images_to_download.itertuples(index=False):
+                url = getattr(row, "thumb_original_url", None)
+                image_id = getattr(row, "id", None)
+                if not url or image_id is None:
+                    continue
+                dest_path = base_dir / str(seq_id) / f"{image_id}.jpg"
+                if dest_path.exists():
+                    downloaded += 1
+                    continue
+                try:
+                    _download_bytes(url, dest_path)
+                    downloaded += 1
+                    pbar.update(1)
+                except requests.HTTPError as exc:
+                    log.warning(
+                        "Failed to download thumbnail for %s: %s", image_id, exc
+                    )
+                    pbar.update(1)
+                except Exception as exc:
+                    log.warning("Unexpected error downloading %s: %s", image_id, exc)
+                    pbar.update(1)
+            if downloaded:
+                stats[str(seq_id)] = downloaded
 
     return stats
 
@@ -352,8 +425,13 @@ python -m io.geoutils convert_to_orthometric \\
 
 ## Sequence Details
 
-Sequences are filtered to car-mounted cameras only (40-120 km/h speed analysis).
-See `sequences/filtered_sequences.json` for details.
+Sequences are filtered to car-mounted cameras only (30-120 km/h max-speed analysis).
+
+- **Kept sequences:** See `sequences/filtered_sequences.json` with speed statistics
+- **Rejected sequences:** See `sequences/filtered_out_sequences.json` for debugging filter behavior
+
+The 30 km/h minimum threshold captures slower urban driving (residential streets, traffic)
+while excluding pedestrian/bicycle sequences (typically < 25 km/h).
 
 ## Notes
 
@@ -458,29 +536,113 @@ def save_filtered_sequences(
     log.info("✓ Saved sequence statistics")
 
 
+def save_filtered_out_sequences(
+    base_dir: Path,
+    all_sequences: dict[str, list],
+    kept_sequences: dict[str, list],
+    speed_stats: dict[str, dict] | None = None,
+    filter_criteria: dict | None = None,
+):
+    """
+    Save metadata for sequences that were filtered out (rejected).
+
+    This is useful for debugging filter behavior and understanding why
+    sequences were rejected.
+
+    Args:
+        base_dir: Output directory
+        all_sequences: All discovered sequences
+        kept_sequences: Sequences that passed the filter
+        speed_stats: Speed statistics per sequence
+        filter_criteria: Dictionary with min_speed_kmh and max_speed_kmh
+    """
+    rejected_sequences = {
+        seq_id: frames
+        for seq_id, frames in all_sequences.items()
+        if seq_id not in kept_sequences
+    }
+
+    stats = {
+        "total_sequences_rejected": len(rejected_sequences),
+        "filter_criteria": filter_criteria or {},
+        "rejection_details": {},
+    }
+
+    for seq_id, frames in rejected_sequences.items():
+        if not frames:
+            continue
+        detail = {
+            "frame_count": len(frames),
+            "first_captured": frames[0].captured_at_ms,
+            "last_captured": frames[-1].captured_at_ms,
+            "camera_type": (
+                frames[0].camera_type if frames[0].camera_type else "unknown"
+            ),
+        }
+
+        # Add speed statistics if available
+        if speed_stats and seq_id in speed_stats:
+            speed_stat = speed_stats[seq_id]
+            # Convert NamedTuple to dict if needed
+            if hasattr(speed_stat, "_asdict"):
+                detail["speed_statistics_kmh"] = speed_stat._asdict()
+            else:
+                detail["speed_statistics_kmh"] = speed_stat
+
+            # Add rejection reason
+            if filter_criteria:
+                max_speed = (
+                    speed_stat.max_kmh
+                    if hasattr(speed_stat, "max_kmh")
+                    else speed_stat.get("max_kmh", 0)
+                )
+                min_threshold = filter_criteria.get("min_speed_kmh", 0)
+                max_threshold = filter_criteria.get("max_speed_kmh", float("inf"))
+
+                if max_speed < min_threshold:
+                    detail["rejection_reason"] = (
+                        f"max_speed ({max_speed:.1f} km/h) < threshold ({min_threshold} km/h)"
+                    )
+                elif max_speed > max_threshold:
+                    detail["rejection_reason"] = (
+                        f"max_speed ({max_speed:.1f} km/h) > threshold ({max_threshold} km/h)"
+                    )
+                else:
+                    detail["rejection_reason"] = "Unknown (possibly insufficient data)"
+        else:
+            detail["rejection_reason"] = "No speed data available"
+
+        stats["rejection_details"][seq_id] = detail
+
+    with open(base_dir / "sequences" / "filtered_out_sequences.json", "w") as f:
+        json.dump(stats, f, indent=2)
+
+    log.info(f"✓ Saved {len(rejected_sequences)} rejected sequence(s) metadata")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Download Mapillary sample data for DTM pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Use default bbox from constants.py
-  python scripts/download_sample_data.py
+  # Use default bbox and download all images from kept sequences (recommended)
+  python scripts/download_sample_data.py --cache-imagery
   
   # Custom bbox
-  python scripts/download_sample_data.py --bbox "-48.6,-27.6,-48.59,-27.59"
+  python scripts/download_sample_data.py --bbox "-48.6,-27.6,-48.59,-27.59" --cache-imagery
   
-  # Download more images per sequence
-  python scripts/download_sample_data.py --images-per-sequence 10
+  # Limit images per sequence (faster download, less dense data)
+  python scripts/download_sample_data.py --cache-imagery --images-per-sequence 10
   
   # Force refresh (ignore cache)
-  python scripts/download_sample_data.py --force-refresh
+  python scripts/download_sample_data.py --force-refresh --cache-imagery
 
-  # Limit total images retrieved
-  python scripts/download_sample_data.py --max-images 2000
+  # Limit total images retrieved from API
+  python scripts/download_sample_data.py --max-images 2000 --cache-imagery
   
-  # Custom speed filtering
-  python scripts/download_sample_data.py --min-speed-kmh 30 --max-speed-kmh 100
+  # Custom speed filtering (default: 30-120 km/h)
+  python scripts/download_sample_data.py --min-speed-kmh 25 --max-speed-kmh 100 --cache-imagery
 
 Environment:
   MAPILLARY_TOKEN    Required. Your Mapillary API token.
@@ -504,13 +666,23 @@ Environment:
     parser.add_argument(
         "--cache-imagery",
         action="store_true",
-        help="Download and cache Mapillary thumbnail images (1024px)",
+        default=True,
+        help="Download and cache Mapillary thumbnail images (1024px). Default: True (recommended for full pipeline testing)",
+    )
+
+    parser.add_argument(
+        "--no-cache-imagery",
+        dest="cache_imagery",
+        action="store_false",
+        help="Skip downloading imagery (metadata only)",
     )
 
     parser.add_argument(
         "--images-per-sequence",
         type=int,
-        help="Maximum thumbnails to cache per sequence (default: 5)",
+        default=None,
+        help="Maximum thumbnails to cache per sequence (default: None = all images). "
+        "For full pipeline testing, downloading all images is recommended for data density.",
     )
 
     parser.add_argument(
@@ -538,8 +710,8 @@ Environment:
     parser.add_argument(
         "--min-speed-kmh",
         type=float,
-        default=40.0,
-        help="Minimum max-speed threshold for car sequences (default: 40 km/h)",
+        default=30.0,
+        help="Minimum max-speed threshold for car sequences (default: 30 km/h)",
     )
 
     parser.add_argument(
@@ -583,6 +755,11 @@ Environment:
     print(f"Bounding box: {bbox_str}")
     print(f"Output directory: {args.output_dir}")
     print(f"Cache imagery: {'Yes' if args.cache_imagery else 'No'}")
+    if args.cache_imagery:
+        if args.images_per_sequence is None:
+            print(f"Images per sequence: ALL (full data density)")
+        else:
+            print(f"Images per sequence: {args.images_per_sequence}")
     print(f"Speed filter: {args.min_speed_kmh}-{args.max_speed_kmh} km/h (max-speed)")
     if args.max_images:
         print(f"Max images: {args.max_images}")
@@ -712,11 +889,34 @@ Environment:
     except Exception as e:
         log.warning(f"Failed to save sequence stats: {e}")
 
+    # Save filtered-out (rejected) sequences for debugging
+    try:
+        filter_criteria = {
+            "min_speed_kmh": args.min_speed_kmh,
+            "max_speed_kmh": args.max_speed_kmh,
+        }
+        save_filtered_out_sequences(
+            args.output_dir,
+            sequences,
+            filtered_sequences,
+            speed_stats if speed_stats else None,
+            filter_criteria,
+        )
+    except Exception as e:
+        log.warning(f"Failed to save rejected sequences: {e}")
+
     # Cache imagery if requested
     cached_images = 0
     if args.cache_imagery:
         try:
-            log.info(f"Caching up to {args.images_per_sequence} images per sequence...")
+            if args.images_per_sequence is None:
+                log.info(
+                    "Caching ALL images per sequence (recommended for full pipeline testing)..."
+                )
+            else:
+                log.info(
+                    f"Caching up to {args.images_per_sequence} images per sequence..."
+                )
             target_seq_ids = (
                 set(filtered_sequences.keys())
                 if filtered_sequences

@@ -28,7 +28,9 @@ OSM_HIGHWAYS = [
 ]
 
 # Imagery & selection
-MIN_SPEED_KMH: float = 40.0
+# Car sequences: 30 km/h min reflects slower urban driving (residential streets, traffic)
+# while still excluding pedestrian/bicycle sequences which typically stay under 25 km/h
+MIN_SPEED_KMH: float = 30.0
 MAX_SPEED_KMH: float = 120.0
 ALLOW_CAMERA_TYPES = {"perspective", "fisheye", "spherical"}
 QUALITY_SCORE_MIN: float = 0.2

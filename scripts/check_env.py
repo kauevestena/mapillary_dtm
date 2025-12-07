@@ -11,7 +11,14 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, Tuple
+from pathlib import Path
+from typing import Callable, Iterable, List, Optional, Tuple
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_VENV_BIN = _REPO_ROOT / ".venv" / "bin"
+if _VENV_BIN.exists():
+    _path = os.environ.get("PATH", "")
+    os.environ["PATH"] = f"{_VENV_BIN}{os.pathsep}{_path}"
 
 
 Result = Tuple[bool, str]
@@ -68,10 +75,13 @@ def check_command(command: str, hint: str | None = None, run_args: Iterable[str]
     return _runner
 
 
+DEFAULT_OPENSFM_IMAGE = "freakthemighty/opensfm:latest"
+
+
 def check_docker_opensfm(args: argparse.Namespace) -> Result:
     if not shutil.which("docker"):
         return False, "docker not detected"
-    image = getattr(args, "opensfm_image", "mapillary/opensfm:latest")
+    image = getattr(args, "opensfm_image", DEFAULT_OPENSFM_IMAGE)
     try:
         subprocess.run(
             ["docker", "image", "inspect", image],
@@ -107,6 +117,74 @@ def check_env_var(name: str, required: bool) -> Callable[[argparse.Namespace], R
     return _runner
 
 
+_TOKEN_FILE_CANDIDATES = (
+    "mapillary_token",
+    ".secrets/mapillary_token",
+    "config/mapillary_token",
+)
+_ENV_FILE_CANDIDATES = (".env", "config/runtime.env")
+
+
+def _parse_token_line(line: str) -> Optional[str]:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if "=" in stripped:
+        key, value = stripped.split("=", 1)
+        if key.strip() != "MAPILLARY_TOKEN":
+            return None
+        candidate = value.strip().strip('"').strip("'")
+    else:
+        candidate = stripped
+    return candidate or None
+
+
+def _read_token_file(path: Path) -> Optional[str]:
+    if not path.exists():
+        return None
+    try:
+        for line in path.read_text(encoding="utf8").splitlines():
+            candidate = _parse_token_line(line)
+            if candidate:
+                return candidate
+    except OSError:
+        return None
+    return None
+
+
+def resolve_mapillary_token() -> Tuple[Optional[str], str]:
+    """Discover Mapillary token from env or known files (no secret logging)."""
+    env_token = os.getenv("MAPILLARY_TOKEN")
+    if env_token:
+        return env_token.strip(), "env MAPILLARY_TOKEN"
+
+    token_file_env = os.getenv("MAPILLARY_TOKEN_FILE")
+    if token_file_env:
+        token = _read_token_file(Path(token_file_env).expanduser())
+        if token:
+            return token, f"MAPILLARY_TOKEN_FILE={token_file_env}"
+
+    repo_root = Path(__file__).resolve().parent.parent
+    for rel_path in _ENV_FILE_CANDIDATES:
+        token = _read_token_file(repo_root / rel_path)
+        if token:
+            return token, rel_path
+
+    for rel_path in _TOKEN_FILE_CANDIDATES:
+        token = _read_token_file(repo_root / rel_path)
+        if token:
+            return token, rel_path
+
+    return None, "missing"
+
+
+def check_mapillary_token(_: argparse.Namespace) -> Result:
+    token, source = resolve_mapillary_token()
+    if token:
+        return True, f"found in {source}"
+    return False, "required (set MAPILLARY_TOKEN or create mapillary_token file)"
+
+
 def base_checks() -> List[Check]:
     return [
         Check("python", True, check_python),
@@ -118,7 +196,7 @@ def base_checks() -> List[Check]:
         Check("laspy[lazrs]", False, check_module("laspy")),
         Check("colmap", True, check_command("colmap", hint="install COLMAP and expose on PATH", run_args=["--help"])),
         Check("docker", True, check_command("docker", hint="install Docker Engine")),
-        Check("mapillary token", True, check_env_var("MAPILLARY_TOKEN", required=True)),
+        Check("mapillary token", True, check_mapillary_token),
     ]
 
 
@@ -164,7 +242,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--opensfm-image",
-        default="mapillary/opensfm:latest",
+        default=DEFAULT_OPENSFM_IMAGE,
         help="Docker image tag to validate for OpenSfM (default: %(default)s).",
     )
     return parser.parse_args()

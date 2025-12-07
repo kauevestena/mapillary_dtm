@@ -55,7 +55,11 @@ def discover_sequences(
 
     client = client or MapillaryClient(token=token)
 
-    cache_dir_path = cache_utils.metadata_cache_dir(cache_dir)
+    if cache_dir is None:
+        cache_dir_path = cache_utils.metadata_cache_dir(None)
+    else:
+        cache_dir_path = Path(cache_dir)
+        cache_dir_path.mkdir(parents=True, exist_ok=True)
 
     seq_ids = list(client.list_sequence_ids_in_bbox(bbox))
     if max_sequences is not None:

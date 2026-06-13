@@ -21,7 +21,7 @@ import numpy as np
 
 from .. import constants
 from ..common_core import FrameMeta, GroundPoint, Pose, ReconstructionResult
-from ..depth.monodepth import predict_depths
+from ..depth.monodepth import CacheResult, predict_depths
 from ..depth.plane_sweep_ground import SweepResult, sweep
 
 ASSUMED_CAM_HEIGHT = 1.6  # meters
@@ -39,6 +39,9 @@ def label_and_filter_points(
     include_monodepth: bool = True,
     include_plane_sweep: bool = True,
     vo_recon: Mapping[str, ReconstructionResult] | None = None,
+    imagery_root: Path | str | None = None,
+    allow_synthetic_depth: bool = True,
+    mono_depths: CacheResult | None = None,
 ) -> List[GroundPoint]:
     """Return ground-only point samples enriched with QA metadata."""
 
@@ -48,9 +51,14 @@ def label_and_filter_points(
     frame_index: Dict[str, Sequence[FrameMeta]] = {
         seq_id: result.frames for seq_id, result in recon.items() if result.frames
     }
-    if include_monodepth:
-        mono_depths = predict_depths(frame_index, out_dir=mono_cache)
-    else:
+    if include_monodepth and mono_depths is None:
+        mono_depths = predict_depths(
+            frame_index,
+            out_dir=mono_cache,
+            imagery_root=imagery_root,
+            allow_synthetic=allow_synthetic_depth,
+        )
+    elif not include_monodepth:
         mono_depths = {}
 
     mask_dir_path = Path(mask_dir)

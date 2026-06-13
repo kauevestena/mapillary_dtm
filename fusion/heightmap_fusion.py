@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import numpy as np
@@ -14,15 +15,33 @@ from .. import constants
 ConsensusPoint = Mapping[str, object]
 
 
+@dataclass(frozen=True)
+class GridSpec:
+    ix_min: int
+    iy_min: int
+    width: int
+    height: int
+    res: float
+
+
 def fuse(
     points: Sequence[ConsensusPoint] | None,
     grid_res: float | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
+    *,
+    return_grid: bool = False,
+) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, GridSpec]:
     """Fuse consensus ground points into a gridded DTM + confidence map."""
 
     if not points:
+        grid = GridSpec(0, 0, 1, 1, float(grid_res or constants.GRID_RES_M))
+        if return_grid:
+            return (
+                np.full((1, 1), np.nan, dtype=np.float32),
+                np.zeros((1, 1), dtype=np.float32),
+                grid,
+            )
         return (
-            np.zeros((1, 1), dtype=np.float32),
+            np.full((1, 1), np.nan, dtype=np.float32),
             np.zeros((1, 1), dtype=np.float32),
         )
 
@@ -31,8 +50,15 @@ def fuse(
     xs = np.asarray([float(pt["x"]) for pt in points], dtype=np.float64)
     ys = np.asarray([float(pt["y"]) for pt in points], dtype=np.float64)
     if xs.size == 0 or ys.size == 0:
+        grid = GridSpec(0, 0, 1, 1, res)
+        if return_grid:
+            return (
+                np.full((1, 1), np.nan, dtype=np.float32),
+                np.zeros((1, 1), dtype=np.float32),
+                grid,
+            )
         return (
-            np.zeros((1, 1), dtype=np.float32),
+            np.full((1, 1), np.nan, dtype=np.float32),
             np.zeros((1, 1), dtype=np.float32),
         )
 
@@ -43,6 +69,7 @@ def fuse(
 
     width = max(1, ix_max - ix_min + 1)
     height = max(1, iy_max - iy_min + 1)
+    grid = GridSpec(ix_min=ix_min, iy_min=iy_min, width=width, height=height, res=res)
 
     height_lists: Dict[Tuple[int, int], List[float]] = defaultdict(list)
     weight_lists: Dict[Tuple[int, int], List[float]] = defaultdict(list)
@@ -96,7 +123,8 @@ def fuse(
         conf *= 0.6 + 0.4 * avg_sem
         confidence[iy, ix] = float(np.clip(conf, 0.0, 1.0))
 
-    dtm = np.nan_to_num(dtm, nan=np.nanmean(dtm[np.isfinite(dtm)]) if np.isfinite(dtm).any() else 0.0)
+    if return_grid:
+        return dtm.astype(np.float32), confidence.astype(np.float32), grid
     return dtm.astype(np.float32), confidence.astype(np.float32)
 
 

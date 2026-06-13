@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Mapping, Optional
@@ -111,13 +112,15 @@ class COLMAPRunner:
             if self.config.workspace_root is not None
             else Path(constants.MAPILLARY_CACHE_ROOT) / "colmap"
         )
-        self.workspace_root = base_root
+        self.workspace_root = base_root.resolve()
         self.workspace_root.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
     def is_available(self) -> bool:
         """Check whether the COLMAP binary is discoverable."""
-        return shutil.which(self.colmap_cmd) is not None
+        if shutil.which(self.colmap_cmd) is not None:
+            return True
+        return self._docker_image_available()
 
     # ------------------------------------------------------------------
     def reconstruct(
@@ -126,14 +129,20 @@ class COLMAPRunner:
         *,
         fixture_path: Optional[Path | str] = None,
         force: bool = False,
+        imagery_root: Optional[Path | str] = None,
+        progress: bool = False,
     ) -> Dict[str, ReconstructionResult]:
         """Run COLMAP or load a canned sparse model."""
         if fixture_path:
-            return self._load_fixture(Path(fixture_path), sequences)
+            results = self._load_fixture(Path(fixture_path), sequences)
+            for result in results.values():
+                result.metadata["source_type"] = "fixture"
+            return results
 
         if not self.is_available():
             raise COLMAPUnavailable(
-                "COLMAP binary not found on PATH; set COLMAP_BIN or provide fixture_path."
+                "COLMAP binary not found on PATH and COLMAP_DOCKER_IMAGE is not available; "
+                "set COLMAP_BIN, pull/set COLMAP_DOCKER_IMAGE, or provide fixture_path."
             )
 
         workspace = self._prepare_workspace(force=force)
@@ -143,9 +152,17 @@ class COLMAPRunner:
         if model_exists and not force:
             log.info("Reusing existing COLMAP sparse model at %s", sparse_dir)
         else:
-            self._run_binary_pipeline(workspace, sequences)
+            self._run_binary_pipeline(workspace, sequences, imagery_root=imagery_root, progress=progress)
 
-        return self._load_fixture(sparse_dir, sequences)
+        txt_dir = workspace / "sparse_txt" / "0"
+        if not any(sparse_dir.glob("*.txt")):
+            self._convert_model_to_text(sparse_dir, txt_dir)
+            sparse_dir = txt_dir
+        results = self._load_fixture(sparse_dir, sequences)
+        for result in results.values():
+            result.metadata["source_type"] = "real"
+            result.metadata["workspace"] = str(workspace)
+        return results
 
     # ------------------------------------------------------------------
     def _prepare_workspace(self, *, force: bool) -> Path:
@@ -163,16 +180,168 @@ class COLMAPRunner:
         self,
         workspace: Path,
         sequences: Mapping[str, Iterable[FrameMeta]],
+        *,
+        imagery_root: Optional[Path | str],
+        progress: bool,
     ) -> None:
-        """Placeholder for real COLMAP invocation."""
+        """Stage imagery and run COLMAP sparse reconstruction."""
         images_dir = workspace / "images"
-        if not any(images_dir.iterdir()):
+        staged = self._stage_images(images_dir, sequences, imagery_root=imagery_root, progress=progress)
+        if staged < 2:
             raise COLMAPUnavailable(
-                f"No imagery staged under {images_dir}. Populate thumbnails or supply COLMAP_FIXTURE."
+                f"COLMAP needs at least two staged images under {images_dir}; staged {staged}."
             )
-        raise COLMAPUnavailable(
-            "Real COLMAP execution not yet automated. Provide COLMAP_FIXTURE export or stage sparse model."
-        )
+        database = workspace / "database.db"
+        sparse_root = workspace / "sparse"
+        sparse_root.mkdir(parents=True, exist_ok=True)
+        timeout = int(os.getenv("COLMAP_TIMEOUT_SEC", "7200"))
+        use_gpu = "1" if self.config.use_gpu else "0"
+        commands = [
+            [
+                "feature_extractor",
+                "--database_path",
+                str(database),
+                "--image_path",
+                str(images_dir),
+                "--ImageReader.single_camera",
+                "0",
+                "--SiftExtraction.use_gpu",
+                use_gpu,
+                "--SiftExtraction.num_threads",
+                str(self.config.threads),
+            ],
+            [
+                "sequential_matcher",
+                "--database_path",
+                str(database),
+                "--SiftMatching.use_gpu",
+                use_gpu,
+            ],
+            [
+                "mapper",
+                "--database_path",
+                str(database),
+                "--image_path",
+                str(images_dir),
+                "--output_path",
+                str(sparse_root),
+                "--Mapper.num_threads",
+                str(self.config.threads),
+            ],
+        ]
+        for command in commands:
+            try:
+                self._run_colmap(command, workspace=workspace, timeout=timeout)
+            except subprocess.CalledProcessError as exc:
+                raise COLMAPUnavailable(f"COLMAP command failed: {' '.join(command)}") from exc
+            except subprocess.TimeoutExpired as exc:
+                raise COLMAPUnavailable(f"COLMAP command timed out: {' '.join(command)}") from exc
+
+    def _stage_images(
+        self,
+        images_dir: Path,
+        sequences: Mapping[str, Iterable[FrameMeta]],
+        *,
+        imagery_root: Optional[Path | str],
+        progress: bool = False,
+    ) -> int:
+        images_dir.mkdir(parents=True, exist_ok=True)
+        staged = 0
+        for frames in _progress_iter(sequences.values(), "COLMAP stage images", progress):
+            for frame in frames:
+                src = _find_cached_image(frame, imagery_root)
+                if src is None:
+                    continue
+                dest = images_dir / f"{frame.image_id}{src.suffix.lower()}"
+                if not dest.exists():
+                    if self._using_docker():
+                        shutil.copy2(src, dest)
+                    else:
+                        try:
+                            os.symlink(src.resolve(), dest)
+                        except OSError:
+                            shutil.copy2(src, dest)
+                staged += 1
+        return staged
+
+    def _convert_model_to_text(self, sparse_dir: Path, txt_dir: Path) -> None:
+        if not sparse_dir.exists():
+            raise COLMAPUnavailable(f"COLMAP sparse output missing: {sparse_dir}")
+        txt_dir.mkdir(parents=True, exist_ok=True)
+        command = [
+            "model_converter",
+            "--input_path",
+            str(sparse_dir),
+            "--output_path",
+            str(txt_dir),
+            "--output_type",
+            "TXT",
+        ]
+        try:
+            self._run_colmap(
+                command,
+                workspace=sparse_dir.parents[1],
+                timeout=int(os.getenv("COLMAP_TIMEOUT_SEC", "7200")),
+            )
+        except subprocess.CalledProcessError as exc:
+            raise COLMAPUnavailable("COLMAP model_converter failed") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise COLMAPUnavailable("COLMAP model_converter timed out") from exc
+        required = [txt_dir / "cameras.txt", txt_dir / "images.txt", txt_dir / "points3D.txt"]
+        missing = [path for path in required if not path.exists()]
+        if missing:
+            raise COLMAPUnavailable(f"COLMAP text export missing files: {missing}")
+
+    def _using_docker(self) -> bool:
+        return shutil.which(self.colmap_cmd) is None and bool(os.getenv("COLMAP_DOCKER_IMAGE"))
+
+    def _docker_image_available(self) -> bool:
+        image = os.getenv("COLMAP_DOCKER_IMAGE")
+        if not image or shutil.which("docker") is None:
+            return False
+        try:
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=10,
+            )
+            return True
+        except Exception:
+            return False
+
+    def _run_colmap(self, args: list[str], *, workspace: Path, timeout: int) -> None:
+        if self._using_docker():
+            image = os.getenv("COLMAP_DOCKER_IMAGE")
+            if not image:
+                raise COLMAPUnavailable("COLMAP_DOCKER_IMAGE is not set")
+            command = [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{workspace}:{workspace}",
+                "-w",
+                str(workspace),
+                image,
+                "colmap",
+                *args,
+            ]
+        else:
+            command = [self.colmap_cmd, *args]
+        log_path = workspace / "colmap_commands.log"
+        with log_path.open("ab") as stream:
+            stream.write(("\n$ " + " ".join(command) + "\n").encode("utf8", errors="replace"))
+            stream.flush()
+            subprocess.run(
+                command,
+                cwd=str(workspace),
+                check=True,
+                timeout=timeout,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+            )
 
     # ------------------------------------------------------------------
     def _load_fixture(
@@ -378,6 +547,33 @@ def _iter_data_lines(path: Path, *, keep_blank: bool = False):
                 yield line if keep_blank else stripped
 
 
+def _find_cached_image(frame: FrameMeta, imagery_root: Optional[Path | str]) -> Optional[Path]:
+    roots: list[Path] = []
+    if imagery_root is not None:
+        roots.append(Path(imagery_root))
+    roots.append(Path(constants.MAPILLARY_CACHE_ROOT) / "imagery")
+    stems = [f"{frame.image_id}_{constants.MAPILLARY_DEFAULT_IMAGE_RES}", frame.image_id]
+    suffixes = [".jpg", ".jpeg", ".png", ".bmp"]
+    for root in roots:
+        seq_dir = root / str(frame.seq_id)
+        for stem in stems:
+            for suffix in suffixes:
+                candidate = seq_dir / f"{stem}{suffix}"
+                if candidate.exists():
+                    return candidate
+    return None
+
+
+def _progress_iter(items, desc: str, enabled: bool):
+    if not enabled:
+        return items
+    try:
+        from tqdm.auto import tqdm
+    except Exception:  # pragma: no cover - optional display dependency
+        return items
+    return tqdm(items, desc=desc, unit="seq")
+
+
 def _resolve_frame(frames: Dict[str, FrameMeta], image_name: str) -> Optional[FrameMeta]:
     if image_name in frames:
         return frames[image_name]
@@ -439,4 +635,3 @@ def _merge_camera_params(
 
     params["_camera_type"] = camera_type
     return params
-

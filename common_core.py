@@ -230,22 +230,73 @@ def enu_to_wgs84(x: float, y: float, z: float,
 
 def camera_ray(u: float, v: float, cam_params: Dict, cam_type: str) -> np.ndarray:
     """
-    Compute unit ray in camera frame for a pixel (u,v).
-    - perspective: uses intrinsics (fx, fy, cx, cy)
-    - fisheye/spherical: placeholder models; refine in implementation
+    Compute a unit ray in camera coordinates for a pixel coordinate.
+
+    The coordinate convention is X right, Y down, Z forward. Perspective uses
+    pinhole intrinsics, fisheye uses an equidistant approximation, and spherical
+    uses an equirectangular panorama model.
     """
-    if cam_type == "perspective":
-        fx, fy = cam_params.get("fx"), cam_params.get("fy")
-        cx, cy = cam_params.get("cx"), cam_params.get("cy")
+    cam_type = (cam_type or "perspective").lower()
+    width = float(cam_params.get("width") or cam_params.get("image_width") or 1.0)
+    height = float(cam_params.get("height") or cam_params.get("image_height") or 1.0)
+    fx, fy, cx, cy = _camera_intrinsics(cam_params, width, height)
+
+    if cam_type in {"perspective", "brown", "pinhole"}:
         x = (u - cx) / fx
         y = (v - cy) / fy
-        r = np.array([x, y, 1.0], dtype=float)
-        return r / np.linalg.norm(r)
-    elif cam_type in ("fisheye", "spherical"):
-        # TODO: implement accurate fisheye/equirectangular ray models per OpenSfM
-        raise NotImplementedError("camera_ray for fisheye/spherical not implemented yet")
+        ray = np.array([x, y, 1.0], dtype=float)
+    elif cam_type in {"fisheye", "omnidirectional"}:
+        x = (u - cx) / fx
+        y = (v - cy) / fy
+        radius = float(np.hypot(x, y))
+        theta = radius
+        if radius < 1e-12:
+            ray = np.array([0.0, 0.0, 1.0], dtype=float)
+        else:
+            scale = np.sin(theta) / radius
+            ray = np.array([x * scale, y * scale, np.cos(theta)], dtype=float)
+    elif cam_type in {"spherical", "equirectangular"}:
+        lon = ((u / max(width, 1.0)) - 0.5) * (2.0 * np.pi)
+        lat = (0.5 - (v / max(height, 1.0))) * np.pi
+        ray = np.array(
+            [
+                np.cos(lat) * np.sin(lon),
+                -np.sin(lat),
+                np.cos(lat) * np.cos(lon),
+            ],
+            dtype=float,
+        )
     else:
         raise ValueError(f"Unknown camera_type: {cam_type}")
+
+    norm = np.linalg.norm(ray)
+    if norm < 1e-12 or not np.isfinite(norm):
+        raise ValueError("Unable to compute a finite camera ray")
+    return ray / norm
+
+
+def _camera_intrinsics(cam_params: Dict, width: float, height: float) -> tuple[float, float, float, float]:
+    fx = cam_params.get("fx_px") or cam_params.get("fx") or cam_params.get("focal_x")
+    fy = cam_params.get("fy_px") or cam_params.get("fy") or cam_params.get("focal_y")
+    if fx is None or fy is None:
+        focal = cam_params.get("focal_px") or cam_params.get("focal") or cam_params.get("f") or 1.0
+        focal = float(focal)
+        if focal <= 10.0:
+            focal *= max(width, height, 1.0)
+        fx = fy = focal
+    cx = cam_params.get("cx_px") or cam_params.get("cx") or cam_params.get("principal_x")
+    cy = cam_params.get("cy_px") or cam_params.get("cy") or cam_params.get("principal_y")
+    if cx is None or cy is None:
+        pp = cam_params.get("principal_point")
+        if isinstance(pp, (list, tuple)) and len(pp) == 2:
+            cx = float(pp[0]) * width
+            cy = float(pp[1]) * height
+        else:
+            cx = width * 0.5
+            cy = height * 0.5
+    fx = max(float(fx), 1e-6)
+    fy = max(float(fy), 1e-6)
+    return fx, fy, float(cx), float(cy)
 
 def ray_plane_intersect(C: np.ndarray, r: np.ndarray,
                         plane_n: np.ndarray, plane_p: np.ndarray) -> float:

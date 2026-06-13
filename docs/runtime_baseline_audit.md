@@ -9,7 +9,7 @@ This note captures the current state of the runtime pipeline and the decisions n
 | Python runtime | Base environment for CLI & libraries | 3.11–3.12 (project docs currently cite 3.12.3) | Ship `pyenv` + `requirements.txt`; verify C++ build tools for `triangle`, `laspy` extras | In use locally; needs reproducible env spec (Milestone 1) |
 | Mapillary Graph API v4 | Real-world imagery & metadata source | No version pin (Graph API); require OAuth token with `images:read` scope | Token sourced from `MAPILLARY_TOKEN` env var or `mapillary_token` file | **Live integration already implemented** (`api/mapillary_client.py`) |
 | Mapillary vector tiles | Coverage discovery | Tiles API v2 | Cache under `cache/mapillary/metadata` to reduce requests | **Live integration already implemented** |
-| OpenSfM runner | Track A sparse/dense reconstruction | Docker image `mapillary/opensfm:latest` (to be pinned once validated) | Prefer containerized invocation to avoid system-wide deps; needs large tmp volume | **Adapter scaffolded** — `geom/opensfm_adapter.py` loads fixtures, binary path TBD |
+| OpenSfM runner | Track A sparse/dense reconstruction | Docker image `freakthemighty/opensfm:latest` or local `opensfm_run_all` (pin once validated) | Prefer containerized invocation to avoid system-wide deps; needs large tmp volume | Adapter stages imagery, invokes binary/container, and loads fixtures for tests |
 | COLMAP CLI | Track B reconstruction parity | Release 3.8 (CUDA build optional) | Expose binary via PATH; confirm CUDA ≥ 11.8 for GPU features | **Adapter available** — fixture loader + CLI knobs (`--colmap-threads`, `--colmap-use-gpu`) |
 | CUDA toolkit & GPU drivers | Optional acceleration for COLMAP & dense depth | CUDA 12.1 + driver 535+ (aligns with PyTorch 2.2 LTS) | Required only when enabling GPU paths; document CPU fallback | **Planned** — current code paths default to CPU stubs |
 | PyTorch + torchvision | Learned mono-depth & uncertainty calibration | PyTorch 2.2 + torchvision 0.17 (CPU by default) | Optional extras in `requirements.txt`; guard runtime errors when unavailable | Imported in code but all usages are synthetic placeholders |
@@ -34,7 +34,7 @@ This note captures the current state of the runtime pipeline and the decisions n
   `aoi_bbox = "-48.596644,-27.591363,-48.589890,-27.586780"` (matches `constants.bbox`).
 - **Token management**: Require `MAPILLARY_TOKEN` in env or `mapillary_token` file before launch. Document token scope requirements (`images:read`, vector tiles).
 - **Cache layout**: Retain current directories (`cache/mapillary/metadata`, `cache/mapillary/imagery`, `cache/masks`, `cache/depth_mono`) with automated quota pruning (default 2 GB metadata / 8 GB imagery).
-- **CLI entry**: `python -m cli.pipeline run --aoi-bbox "$aoi_bbox" --out-dir ./out/fln_baseline --enforce-breaklines` (flags toggled as features land).
+- **CLI entry**: `python -m dtm_from_mapillary.cli.pipeline run --aoi-bbox "$aoi_bbox" --out-dir ./out/fln_baseline --enforce-breaklines` (use `--allow-synthetic --no-strict-production` only for smoke/dev runs).
 - **Expected artifacts** (all routed under `out/fln_baseline/`):
   - GeoTIFFs: `dtm_0p5m_ellipsoid.tif`, `slope_deg.tif`, `confidence.tif`
   - Ground points: `ground_points.laz` (falls back to `.npz` without LAZ support)

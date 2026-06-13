@@ -388,30 +388,56 @@ To enable external validation, place a reference DTM in `reference_dtm/`:
 
 ```bash
 # Basic run (ellipsoidal heights, 0.5m resolution)
-python -m cli.pipeline run \\
+OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\
+python -m dtm_from_mapillary.cli.pipeline run \\
   --aoi-bbox "{bbox_str}" \\
-  --out-dir {base_dir}/outputs
+  --dataset-dir {base_dir} \\
+  --imagery-root {base_dir}/imagery \\
+  --out-dir {base_dir}/outputs \\
+  --allow-synthetic --no-strict-production
 
 # With breakline enforcement (curbs/edges)
-python -m cli.pipeline run \\
+OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\
+python -m dtm_from_mapillary.cli.pipeline run \\
   --aoi-bbox "{bbox_str}" \\
+  --dataset-dir {base_dir} \\
+  --imagery-root {base_dir}/imagery \\
   --out-dir {base_dir}/outputs \\
-  --enforce-breaklines
+  --enforce-breaklines \\
+  --allow-synthetic --no-strict-production
 
 # With learned uncertainty calibration
-python -m cli.pipeline run \\
+OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\
+python -m dtm_from_mapillary.cli.pipeline run \\
   --aoi-bbox "{bbox_str}" \\
+  --dataset-dir {base_dir} \\
+  --imagery-root {base_dir}/imagery \\
   --out-dir {base_dir}/outputs \\
-  --use-learned-uncertainty
+  --use-learned-uncertainty \\
+  --allow-synthetic --no-strict-production
 ```
 
 ### 2. QA Validation (after obtaining reference DTM)
 
 ```bash
-python -m qa.qa_external \\
+python -m dtm_from_mapillary.qa.qa_external \\
   --generated-dtm {base_dir}/outputs/dtm_0p5m_ellipsoid.tif \\
   --reference-dtm {base_dir}/reference_dtm/reference.tif \\
-  --report-out {base_dir}/qa_reports/external_validation.html
+  --out-dir {base_dir}/qa_reports/external_validation
+```
+
+For strict production QA with the tracked project reference raster:
+
+```bash
+python scripts/setup_production_models.py --accept-model-licenses
+COLMAP_DOCKER_IMAGE=colmap/colmap:latest \\
+python -m dtm_from_mapillary.cli.pipeline run \\
+  --dataset-dir {base_dir} \\
+  --imagery-root {base_dir}/imagery \\
+  --reference-dtm qa/data/qa_dtm.tif \\
+  --out-dir {base_dir}/outputs/production_qa \\
+  --enforce-breaklines \\
+  --strict-production
 ```
 
 ### 3. Convert to Orthometric Heights (optional)
@@ -965,11 +991,16 @@ Environment:
     print(f"Dataset location: {args.output_dir.absolute()}")
     print()
     print("Next steps:")
-    print("  1. (Optional) Add reference DTM to reference_dtm/ for validation")
-    print("  2. Run the pipeline:")
-    print(f"     python -m cli.pipeline run \\")
+    print("  1. For strict QA, cache production models:")
+    print("     python scripts/setup_production_models.py --accept-model-licenses")
+    print("  2. Run a development smoke pipeline:")
+    print("     OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\")
+    print(f"     python -m dtm_from_mapillary.cli.pipeline run \\")
     print(f'       --aoi-bbox "{bbox_str}" \\')
-    print(f"       --out-dir {args.output_dir}/outputs")
+    print(f"       --dataset-dir {args.output_dir} \\")
+    print(f"       --imagery-root {args.output_dir}/imagery \\")
+    print(f"       --out-dir {args.output_dir}/outputs \\")
+    print("       --allow-synthetic --no-strict-production")
     print()
     print("See data/sample_dataset/README.md for detailed usage instructions")
     print("=" * 70)

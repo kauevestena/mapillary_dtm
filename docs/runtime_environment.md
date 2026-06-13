@@ -37,7 +37,8 @@ This guide defines the baseline environment required to run the Mapillary DTM pi
 | Tool | Version | Install Guidance | Usage |
 | --- | --- | --- | --- |
 | COLMAP | 3.8 | Prefer official binary release; otherwise build from source with CUDA off/on. Ensure `colmap --help` works. | Track B reconstruction. |
-| OpenSfM | Latest Docker image (`mapillary/opensfm:latest`) or pinned commit `2024-05-15` | Pull docker image or install from source with `pip install opensfm @ git+https://github.com/mapillary/OpenSfM@<commit>`. | Track A reconstruction. |
+| COLMAP Docker | `colmap/colmap:latest` | Optional fallback when `colmap` is not on PATH; set `COLMAP_DOCKER_IMAGE=colmap/colmap:latest`. | Track B reconstruction fallback. |
+| OpenSfM | Docker image `freakthemighty/opensfm:latest` or pinned OpenSfM commit | Pull docker image or install from source with `pip install opensfm @ git+https://github.com/mapillary/OpenSfM@<commit>`. | Track A reconstruction. |
 | Docker Engine | 24.0+ (if using OpenSfM container) | Install from Docker docs; add user to `docker` group. | Running OpenSfM container workflows. |
 | GNU Parallel (optional) | 20231122 | `sudo apt-get install -y parallel` | Batch invocation helper for SfM jobs. |
 
@@ -67,10 +68,16 @@ For GPU-enabled PyTorch replace the wheel specification in `requirements-optiona
 | --- | --- | --- | --- |
 | `MAPILLARY_TOKEN` | OAuth token with `images:read` scope | Yes (runtime) | Alternative: define in `.env`, set `MAPILLARY_TOKEN_FILE`, or place token in repo root `mapillary_token`. |
 | `OPEN_SFM_BIN` | Path to `opensfm_run_all` (or wrapper) | No | Overrides the binary used by the OpenSfM adapter. |
+| `OPEN_SFM_DOCKER_IMAGE` | Docker image for OpenSfM execution | No | Defaults to `freakthemighty/opensfm:latest`. |
 | `OPEN_SFM_FIXTURE` | Path to canned OpenSfM reconstruction | No | Enables fixture-driven runs without invoking the binary. |
 | `OPEN_SFM_FORCE_SYNTHETIC` | Force synthetic SfM scaffold | No | Set to `1` to skip adapter attempts entirely. |
+| `COLMAP_DOCKER_IMAGE` | Docker image for COLMAP fallback | No | Used only when `colmap` is not on PATH. |
+| `GROUND_MASK_MODEL_ID` | Hugging Face segmentation model id | No | Defaults to `nvidia/segformer-b0-finetuned-cityscapes-512-1024`. |
+| `MONODEPTH_MODEL_ID` | Hugging Face depth model id | No | Defaults to `depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf`. |
+| `DTM_MODEL_CACHE_DIR` | Hugging Face model cache dir | No | Defaults to `models/huggingface`. |
 | `CUDA_VISIBLE_DEVICES` | GPU selection | No | Set when running GPU-accelerated stages. |
-| `DTM_CACHE_ROOT` | Override cache directory root | No | Defaults to `./cache`. |
+| `DTM_CACHE_ROOT` | Override cache directory root | No | Defaults to `./cache`; Mapillary cache resolves below it. |
+| `MAPILLARY_CACHE_ROOT` | Override Mapillary cache directory directly | No | Defaults to `$DTM_CACHE_ROOT/mapillary`. |
 
 ## Recommended Hardware Baselines
 
@@ -85,14 +92,17 @@ Run the following after provisioning a machine:
 ```bash
 python -m pip install -r requirements.txt
 python -m pip install -r requirements-optional.txt  # if needed
-python scripts/check_env.py --full
+python scripts/setup_production_models.py --accept-model-licenses
+python scripts/check_env.py --full --strict-production
 ```
 
 Ensure that:
 1. `colmap --help` succeeds.
-2. `docker run --rm mapillary/opensfm:latest opensfm_run_all --help` returns usage info.
-3. `nvidia-smi` reports GPUs when CUDA paths are enabled.
-4. `pytest` passes when run against smoke fixtures (planned in later milestones).
+2. Or `COLMAP_DOCKER_IMAGE` points to an available COLMAP Docker image.
+3. `docker run --rm freakthemighty/opensfm:latest opensfm_run_all --help` returns usage info.
+4. Ground segmentation and monodepth models are cached under `models/huggingface`.
+5. `nvidia-smi` reports GPUs when CUDA paths are enabled.
+6. `pytest` passes when run against smoke fixtures.
 
 ## Change Management
 

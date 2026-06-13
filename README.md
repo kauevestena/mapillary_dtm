@@ -108,9 +108,14 @@ dtm_from_mapillary/
      pip install -r requirements-dev.txt         # Developer tools + tests
      ```
 
-2. **Validate your setup** (ensures COLMAP, Docker, tokens are in place):
+2. **Cache production models and validate your setup**:
    ```bash
-   python scripts/check_env.py --full
+   python scripts/setup_production_models.py --accept-model-licenses
+   ```
+   > This downloads model weights into ignored local cache storage and writes `models/production_models.json`.
+
+   ```bash
+   python scripts/check_env.py --full --strict-production
    ```
 
 3. **Set Mapillary API token** (Graph API v4):
@@ -122,6 +127,31 @@ dtm_from_mapillary/
 4. **Run the pipeline** over a bounding box (lon_min,lat_min,lon_max,lat_max):
    ```bash
    python -m dtm_from_mapillary.cli.pipeline run --aoi-bbox "-122.45,37.76,-122.41,37.79" --out-dir ./out
+   ```
+   By default this is a strict production run: real backends must be available and synthetic/heuristic fallbacks are disabled. For a development smoke run against the local sample bundle:
+   ```bash
+   OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --dataset-dir data/sample_dataset \
+     --imagery-root data/sample_dataset/imagery \
+     --out-dir data/sample_dataset/outputs \
+     --allow-synthetic --no-strict-production
+   ```
+   Validate the local sample bundle without running the full pipeline:
+   ```bash
+   python scripts/check_sample_dataset.py --dataset-dir data/sample_dataset
+   ```
+
+   Strict sample QA run against the tracked reference raster:
+   ```bash
+   COLMAP_DOCKER_IMAGE=colmap/colmap:latest \
+   python -m dtm_from_mapillary.cli.pipeline run \
+     --dataset-dir data/sample_dataset \
+     --imagery-root data/sample_dataset/imagery \
+     --reference-dtm qa/data/qa_dtm.tif \
+     --out-dir data/sample_dataset/outputs/production_qa \
+     --enforce-breaklines \
+     --strict-production
    ```
    
    **Optional: Enable learned uncertainty calibration:**
@@ -196,6 +226,9 @@ dtm_from_mapillary/
    - `out/confidence.tif`
    - `out/ground_points.laz`
    - `out/report.html`
+   - `out/manifest.json`
+   - `out/qa/qa_summary.json`
+   - `out/qa/dz.tif`, `out/qa/abs_dz.tif`, `out/qa/slope_diff_deg.tif` when `--reference-dtm` is supplied
    - Cache root (metadata & imagery): `cache/mapillary/`
 
 > Advanced: To replay a canned OpenSfM reconstruction without invoking the binary, set `OPEN_SFM_FIXTURE=qa/data/opensfm_fixture/reconstruction.json`. Use `OPEN_SFM_FORCE_SYNTHETIC=1` to skip adapter attempts.

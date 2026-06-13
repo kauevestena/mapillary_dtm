@@ -28,6 +28,8 @@ def run(
     imagery_root: Optional[Path | str] = None,
     force_synthetic: bool = False,
     min_inliers: Optional[int] = None,
+    allow_synthetic: bool = True,
+    progress: bool = False,
 ) -> Dict[str, ReconstructionResult]:
     """
     Estimate relative trajectories per sequence using visual odometry.
@@ -46,6 +48,8 @@ def run(
     )
 
     if force_synthetic or cv2 is None:
+        if not allow_synthetic:
+            raise RuntimeError("VO synthetic fallback disabled and OpenCV/real VO is unavailable")
         if force_synthetic:
             log.info("VO forced to synthetic mode (flag or CLI)")
         elif cv2 is None:
@@ -56,12 +60,20 @@ def run(
     loader = ImageryLoader(imagery_root)
     used_synthetic = False
 
-    for seq_id, frames in seqs.items():
+    for seq_id, frames in _progress_iter(seqs.items(), "VO", progress):
         if not frames:
             continue
 
-        track = _run_opencv_sequence(seq_id, frames, loader, min_inliers=min_inliers)
+        track = _run_opencv_sequence(
+            seq_id,
+            frames,
+            loader,
+            min_inliers=min_inliers,
+            allow_synthetic_steps=allow_synthetic,
+        )
         if track is None:
+            if not allow_synthetic:
+                raise RuntimeError(f"VO failed for {seq_id} and synthetic fallback is disabled")
             used_synthetic = True
             syn = _run_synthetic({seq_id: frames}, rng_seed=rng_seed)
             if syn:
@@ -76,12 +88,23 @@ def run(
     return results
 
 
+def _progress_iter(items, desc: str, enabled: bool):
+    if not enabled:
+        return items
+    try:
+        from tqdm.auto import tqdm
+    except Exception:  # pragma: no cover - optional display dependency
+        return items
+    return tqdm(items, desc=desc, unit="seq")
+
+
 def _run_opencv_sequence(
     seq_id: str,
     frames: Sequence[FrameMeta],
     loader: ImageryLoader,
     *,
     min_inliers: int,
+    allow_synthetic_steps: bool,
 ) -> Optional[ReconstructionResult]:
     images: List[tuple[FrameMeta, np.ndarray]] = []
     for frame in frames:
@@ -121,6 +144,8 @@ def _run_opencv_sequence(
         K = _camera_matrix(frame_a)
         if K is None:
             log.debug("VO missing intrinsics for %s; falling back to synthetic step", frame_a.image_id)
+            if not allow_synthetic_steps:
+                return None
             delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
             current_center = current_center + delta_center
             step_lengths.append(float(np.linalg.norm(delta_center)))
@@ -134,6 +159,8 @@ def _run_opencv_sequence(
         kp2, des2 = orb.detectAndCompute(img_b, None)
         if des1 is None or des2 is None or len(kp1) < 8 or len(kp2) < 8:
             log.debug("VO insufficient keypoints between %s and %s", frame_a.image_id, frame_b.image_id)
+            if not allow_synthetic_steps:
+                return None
             delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
             current_center = current_center + delta_center
             step_lengths.append(float(np.linalg.norm(delta_center)))
@@ -154,6 +181,8 @@ def _run_opencv_sequence(
 
         if len(matches) < min_inliers:
             log.debug("VO match count below threshold (%d < %d) between %s and %s", len(matches), min_inliers, frame_a.image_id, frame_b.image_id)
+            if not allow_synthetic_steps:
+                return None
             delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
             current_center = current_center + delta_center
             step_lengths.append(float(np.linalg.norm(delta_center)))
@@ -176,6 +205,8 @@ def _run_opencv_sequence(
         )
         if E is None or E.size == 0:
             log.debug("VO essential matrix failed between %s and %s", frame_a.image_id, frame_b.image_id)
+            if not allow_synthetic_steps:
+                return None
             delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
             current_center = current_center + delta_center
             step_lengths.append(float(np.linalg.norm(delta_center)))
@@ -189,6 +220,8 @@ def _run_opencv_sequence(
         inliers = int(mask_pose.sum()) if mask_pose is not None else 0
         if inliers < min_inliers:
             log.debug("VO recoverPose inliers below threshold (%d < %d)", inliers, min_inliers)
+            if not allow_synthetic_steps:
+                return None
             delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
             current_center = current_center + delta_center
             step_lengths.append(float(np.linalg.norm(delta_center)))
@@ -219,6 +252,7 @@ def _run_opencv_sequence(
     metadata = {
         "scale": max(step_mean, 1e-6),
         "mode": "opencv",
+        "source_type": "real",
         "pairs_processed": total_pairs,
         "avg_inliers": float(np.mean(inlier_counts)) if inlier_counts else 0.0,
         "avg_matches": float(total_matches / max(total_pairs, 1)),
@@ -340,6 +374,7 @@ def _run_synthetic(
                 "scale": scale,
                 "rng_seed": rng_seed,
                 "mode": "synthetic",
+                "source_type": "synthetic",
             },
         )
 

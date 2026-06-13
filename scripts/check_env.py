@@ -76,6 +76,7 @@ def check_command(command: str, hint: str | None = None, run_args: Iterable[str]
 
 
 DEFAULT_OPENSFM_IMAGE = "freakthemighty/opensfm:latest"
+DEFAULT_COLMAP_IMAGE = os.getenv("COLMAP_DOCKER_IMAGE", "colmap/colmap:latest")
 
 
 def check_docker_opensfm(args: argparse.Namespace) -> Result:
@@ -97,6 +98,38 @@ def check_docker_opensfm(args: argparse.Namespace) -> Result:
         return False, f"docker image inspect timeout: {exc}"
 
 
+def check_docker_image_arg(arg_name: str, label: str) -> Callable[[argparse.Namespace], Result]:
+    def _runner(args: argparse.Namespace) -> Result:
+        if not shutil.which("docker"):
+            return False, "docker not detected"
+        image = getattr(args, arg_name)
+        try:
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=10,
+            )
+            return True, f"{label} docker image {image} available"
+        except subprocess.CalledProcessError:
+            return False, f"{label} docker image {image} missing (run `docker pull {image}`)"
+        except subprocess.TimeoutExpired as exc:
+            return False, f"{label} docker image inspect timeout: {exc}"
+
+    return _runner
+
+
+def check_colmap_backend(args: argparse.Namespace) -> Result:
+    colmap_bin = os.getenv("COLMAP_BIN", "colmap")
+    if shutil.which(colmap_bin):
+        return True, f"found binary {colmap_bin}"
+    docker_ok, docker_message = check_docker_image_arg("colmap_image", "COLMAP")(args)
+    if docker_ok:
+        return True, docker_message
+    return False, f"binary {colmap_bin} missing; {docker_message}"
+
+
 def check_cuda(_: argparse.Namespace) -> Result:
     nvcc = shutil.which("nvcc")
     smi = shutil.which("nvidia-smi")
@@ -113,6 +146,48 @@ def check_env_var(name: str, required: bool) -> Callable[[argparse.Namespace], R
             return True, "set"
         status = "required" if required else "recommended"
         return (not required), f"{status} env var not set"
+
+    return _runner
+
+
+def check_no_forced_synthetic(_: argparse.Namespace) -> Result:
+    offenders = [
+        name
+        for name in ("OPEN_SFM_FORCE_SYNTHETIC", "COLMAP_FORCE_SYNTHETIC")
+        if os.getenv(name, "").lower() not in {"", "0", "false", "no", "off"}
+    ]
+    if offenders:
+        return False, "forced synthetic env vars set: " + ", ".join(offenders)
+    return True, "no forced synthetic env vars"
+
+
+def check_model_cache(
+    env_path: str,
+    env_model_id: str,
+    default_model_id: str,
+    label: str,
+) -> Callable[[argparse.Namespace], Result]:
+    def _runner(_: argparse.Namespace) -> Result:
+        path_value = os.getenv(env_path)
+        if path_value and Path(path_value).exists():
+            return True, f"{label} path set: {path_value}"
+        model_id = os.getenv(env_model_id, default_model_id)
+        try:
+            from huggingface_hub import try_to_load_from_cache
+        except Exception as exc:
+            return False, f"huggingface_hub unavailable: {exc}"
+        try:
+            cached = try_to_load_from_cache(
+                model_id,
+                "config.json",
+                cache_dir=os.getenv("DTM_MODEL_CACHE_DIR", "models/huggingface"),
+                revision=os.getenv("DTM_MODEL_REVISION"),
+            )
+        except Exception as exc:
+            return False, f"{label} cache lookup failed: {exc}"
+        if cached and isinstance(cached, (str, os.PathLike)) and Path(cached).exists():
+            return True, f"{label} cached for {model_id}"
+        return False, f"{label} missing: set {env_path} or run scripts/setup_production_models.py"
 
     return _runner
 
@@ -194,7 +269,7 @@ def base_checks() -> List[Check]:
         Check("osmnx", True, check_module("osmnx")),
         Check("triangle", True, check_module("triangle", hint="install system build tools")),
         Check("laspy[lazrs]", False, check_module("laspy")),
-        Check("colmap", True, check_command("colmap", hint="install COLMAP and expose on PATH", run_args=["--help"])),
+        Check("colmap", True, check_colmap_backend),
         Check("docker", True, check_command("docker", hint="install Docker Engine")),
         Check("mapillary token", True, check_mapillary_token),
     ]
@@ -205,8 +280,31 @@ def optional_checks() -> List[Check]:
         Check("opensfm docker image", False, check_docker_opensfm),
         Check("torch", False, check_module("torch", hint="install from requirements-optional.txt")),
         Check("torchvision", False, check_module("torchvision", hint="install from requirements-optional.txt")),
+        Check("transformers", False, check_module("transformers", hint="install from requirements-optional.txt")),
+        Check("huggingface_hub", False, check_module("huggingface_hub", hint="install from requirements-optional.txt")),
+        Check("safetensors", False, check_module("safetensors", hint="install from requirements-optional.txt")),
+        Check("Pillow", False, check_module("PIL", hint="install from requirements-optional.txt")),
         Check("CUDA toolchain", False, check_cuda),
         Check("nvidia-smi", False, check_command("nvidia-smi", hint="install NVIDIA driver")),
+    ]
+
+
+def strict_production_checks() -> List[Check]:
+    return [
+        Check("no forced synthetic", True, check_no_forced_synthetic),
+        Check("opensfm docker image", True, check_docker_opensfm),
+        Check("ground mask model", True, check_model_cache(
+            "GROUND_MASK_MODEL_PATH",
+            "GROUND_MASK_MODEL_ID",
+            "nvidia/segformer-b0-finetuned-cityscapes-512-1024",
+            "ground mask model",
+        )),
+        Check("monodepth model", True, check_model_cache(
+            "MONODEPTH_MODEL_PATH",
+            "MONODEPTH_MODEL_ID",
+            "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf",
+            "monodepth model",
+        )),
     ]
 
 
@@ -245,6 +343,16 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OPENSFM_IMAGE,
         help="Docker image tag to validate for OpenSfM (default: %(default)s).",
     )
+    parser.add_argument(
+        "--colmap-image",
+        default=DEFAULT_COLMAP_IMAGE,
+        help="Docker image tag to validate for COLMAP fallback (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--strict-production",
+        action="store_true",
+        help="Require strict-production model/backend readiness.",
+    )
     return parser.parse_args()
 
 
@@ -263,6 +371,10 @@ def main() -> int:
     if args.full:
         optional_rows, _ = run_checks(optional_checks(), args)
         rows.extend(optional_rows)
+    if args.strict_production:
+        strict_rows, strict_ok = run_checks(strict_production_checks(), args)
+        rows.extend(strict_rows)
+        required_ok = required_ok and strict_ok
     if args.json:
         print(json.dumps(rows, indent=2))
     else:

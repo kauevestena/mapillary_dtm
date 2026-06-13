@@ -182,6 +182,11 @@ qa/data/*
 !qa/data/colmap_fixture/**
 
 # big files:
+models/huggingface/
+models/**/*.bin
+models/**/*.safetensors
+models/**/*.pt
+models/**/*.pth
 
 # General
 __pycache__/

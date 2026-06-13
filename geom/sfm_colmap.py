@@ -388,6 +388,7 @@ def _run_synthetic(
             "point_count": int(points_xyz.shape[0]),
             "cameras_refined": False,
             "coordinate_frame": "enu",
+            "source_type": "synthetic",
         }
         if include_metadata:
             metadata.update(include_metadata.get(seq_id, {}))
@@ -438,6 +439,9 @@ def run(
     fixture_path: Optional[str | os.PathLike[str]] = None,
     force: bool = False,
     workspace_root: Optional[str | os.PathLike[str]] = None,
+    imagery_root: Optional[str | os.PathLike[str]] = None,
+    allow_synthetic: bool = True,
+    progress: bool = False,
 ) -> Dict[str, ReconstructionResult]:
     """
     Attempt to use a real COLMAP reconstruction (fixture or binary) and fall back to the
@@ -467,6 +471,8 @@ def run(
                 seqs,
                 fixture_path=fixture_path,
                 force=force,
+                imagery_root=imagery_root,
+                progress=progress,
             )
             if base_results:
                 logger.info(
@@ -481,12 +487,19 @@ def run(
                 )
                 return processed
         except COLMAPUnavailable as exc:
+            if not allow_synthetic:
+                raise
             logger.info("COLMAP unavailable: %s; using synthetic fallback", exc)
         except Exception as exc:  # pragma: no cover - unexpected adapter failure
+            if not allow_synthetic:
+                raise
             logger.exception(
                 "COLMAP adapter failed: %s; falling back to synthetic path",
                 exc,
             )
+
+    if not allow_synthetic:
+        raise COLMAPUnavailable("COLMAP synthetic fallback disabled and no real reconstruction was produced")
 
     return _run_synthetic(
         seqs,

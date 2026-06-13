@@ -325,6 +325,7 @@ def _run_synthetic(
             "point_count": int(points_xyz.shape[0]),
             "cameras_refined": False,
             "coordinate_frame": "enu",
+            "source_type": "synthetic",
         }
 
         # Apply self-calibration if requested
@@ -367,6 +368,12 @@ def run(
     rng_seed: int = 2025,
     refine_cameras: bool = False,
     refinement_method: str = "full",
+    *,
+    imagery_root: Optional[str | os.PathLike[str]] = None,
+    workspace_root: Optional[str | os.PathLike[str]] = None,
+    allow_synthetic: bool = True,
+    force: bool = False,
+    progress: bool = False,
 ) -> Dict[str, ReconstructionResult]:
     """
     Attempt to use a real OpenSfM reconstruction (fixture or binary) and fall back to the
@@ -377,21 +384,30 @@ def run(
         return {}
 
     if os.getenv("OPEN_SFM_FORCE_SYNTHETIC") != "1":
-        runner = OpenSfMRunner()
+        runner = OpenSfMRunner(workspace_root=workspace_root)
         fixture = os.getenv("OPEN_SFM_FIXTURE")
         try:
             results = runner.reconstruct(
                 seqs,
                 fixture_path=fixture,
-                force=False,
+                force=force,
+                imagery_root=imagery_root,
+                progress=progress,
             )
             if results:
                 logger.info("OpenSfM adapter produced results using %s", fixture or "binary invocation")
                 return results
         except OpenSfMUnavailable as exc:
+            if not allow_synthetic:
+                raise
             logger.info("OpenSfM unavailable: %s; using synthetic fallback", exc)
         except Exception as exc:
+            if not allow_synthetic:
+                raise
             logger.exception("OpenSfM adapter failed: %s; falling back to synthetic path", exc)
+
+    if not allow_synthetic:
+        raise OpenSfMUnavailable("OpenSfM synthetic fallback disabled and no real reconstruction was produced")
 
     return _run_synthetic(
         seqs,

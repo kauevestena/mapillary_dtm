@@ -2,6 +2,7 @@
 Centralized configuration knobs and thresholds.
 Change values here to tune behavior without touching the modules.
 """
+import os
 
 # Spatial resolution
 GRID_RES_M: float = 0.5
@@ -101,7 +102,10 @@ DEFAULT_FIELDS = [
 ]
 
 # Mapillary cache configuration
-MAPILLARY_CACHE_ROOT = "cache/mapillary"
+MAPILLARY_CACHE_ROOT = os.getenv(
+    "MAPILLARY_CACHE_ROOT",
+    os.path.join(os.getenv("DTM_CACHE_ROOT", "cache"), "mapillary"),
+)
 MAPILLARY_METADATA_CACHE_MAX_GB = 2.0
 MAPILLARY_IMAGERY_CACHE_MAX_GB = 8.0
 MAPILLARY_DEFAULT_IMAGE_RES = 1024

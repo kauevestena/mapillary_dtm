@@ -156,9 +156,13 @@ def build_constrained_tin(
         n_result = len(vertices_2d)
         z_result = np.zeros(n_result)
 
-        # Map Z values (may need refinement if triangle adds Steiner points)
-        for i in range(min(n_result, len(combined_z))):
-            z_result[i] = combined_z[i]
+        known_tree = cKDTree(combined_xy)
+        for i in range(n_result):
+            if i < len(combined_z) and np.allclose(vertices_2d[i], combined_xy[i]):
+                z_result[i] = combined_z[i]
+            else:
+                _, nn_idx = known_tree.query(vertices_2d[i])
+                z_result[i] = combined_z[int(nn_idx)]
 
         # Create interpolator from triangulation
         interpolator = LinearNDInterpolator(vertices_2d, z_result, fill_value=np.nan)

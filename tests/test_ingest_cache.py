@@ -4,10 +4,10 @@ import time
 from pathlib import Path
 from typing import Dict, List, Sequence
 
-from common_core import FrameMeta
-from ingest.sequence_scan import discover_sequences
-from ingest.imagery_cache import prefetch_imagery
-from ingest import cache_utils
+from dtm_from_mapillary.common_core import FrameMeta
+from dtm_from_mapillary.ingest.sequence_scan import discover_sequences
+from dtm_from_mapillary.ingest.imagery_cache import prefetch_imagery
+from dtm_from_mapillary.ingest import cache_utils
 
 
 class _SequenceClient:
@@ -67,7 +67,7 @@ class _ImageryClient:
 
 
 def _bbox() -> Sequence[float]:
-    return (-1.0, -1.0, 1.0, 1.0)
+    return (-1.0, -1.0, 3.0, 4.0)
 
 
 def test_discover_sequences_caches_metadata(tmp_path: Path) -> None:

@@ -20,13 +20,16 @@ def find_anchors(
     token: str | None = None,
     cache_dir: Path | str = Path("cache/anchors"),
     sample_path: Path | str = Path("qa/data/sample_anchors.json"),
+    *,
+    allow_synthetic: bool = True,
 ) -> List[Anchor]:
     """Return vertical anchors per sequence.
 
     Preference order:
     1. Sequence-specific cache (`cache/anchors/<seq>.json`).
     2. Sample QA dataset (if sequence appears there).
-    3. Synthetic heuristic using GNSS trajectory to place poles along curb.
+    3. Synthetic heuristic using GNSS trajectory to place poles along curb
+       only when ``allow_synthetic`` is true.
     """
 
     cache_dir = Path(cache_dir)
@@ -42,10 +45,13 @@ def find_anchors(
         elif seq_id in sample_map:
             anchors = sample_map[seq_id]
             _write_cache(cache_dir, seq_id, anchors)
-        else:
+        elif allow_synthetic:
             anchors = _synthesize_anchors(seq_id, frames)
             if anchors:
                 _write_cache(cache_dir, seq_id, anchors)
+        else:
+            anchors = []
+            log.info("No real/cached anchors for %s; continuing without synthetic anchors", seq_id)
 
         collected.extend(anchors)
 

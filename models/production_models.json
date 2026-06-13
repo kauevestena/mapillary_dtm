@@ -1,0 +1,32 @@
+{
+  "created_at": "2026-06-13T01:36:56.638238Z",
+  "cache_dir": "models/huggingface",
+  "accepted_model_licenses": true,
+  "models": [
+    {
+      "name": "ground_segmentation",
+      "model_id": "nvidia/segformer-b0-finetuned-cityscapes-512-1024",
+      "task": "semantic-segmentation",
+      "ground_labels": [
+        "road",
+        "sidewalk",
+        "terrain"
+      ],
+      "license": "other / NVIDIA SegFormer non-commercial research-evaluation terms",
+      "requested_revision": null,
+      "resolved_revision": "7a91500a7086b805eeb868719ea5542a3e0bdeb3",
+      "snapshot_path": "models/huggingface/models--nvidia--segformer-b0-finetuned-cityscapes-512-1024/snapshots/7a91500a7086b805eeb868719ea5542a3e0bdeb3",
+      "tree_sha256": "3125828869ee8d3142f0289aa0c129913aced7be23dde30904c74dd418fcc74b"
+    },
+    {
+      "name": "monodepth",
+      "model_id": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf",
+      "task": "depth-estimation",
+      "license": "apache-2.0",
+      "requested_revision": null,
+      "resolved_revision": "fd2c22027eaf20374204f14099b8341e1925ad39",
+      "snapshot_path": "models/huggingface/models--depth-anything--Depth-Anything-V2-Metric-Outdoor-Small-hf/snapshots/fd2c22027eaf20374204f14099b8341e1925ad39",
+      "tree_sha256": "0a25b354b44d43fdf7b6340d6cf7d0a97f7f28fdcde912623b0d3922d3ca3d03"
+    }
+  ]
+}

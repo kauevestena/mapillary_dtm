@@ -2,6 +2,10 @@
 **Date:** 2025-10-08  
 **Status:** ✅ ALL MILESTONES COMPLETE
 
+> **Current note:** This is a historical scaffold/synthetic verification report.
+> Production readiness is now governed by strict pipeline mode, runtime checks,
+> real backend provenance in manifests, and `fix-runtime-roadmap.md`.
+
 ---
 
 ## Executive Summary
@@ -772,4 +776,3 @@ python -m dtm_from_mapillary.cli.pipeline run \
 **Report Generated:** 2025-10-08  
 **Verification Method:** Manual code review + automated test execution  
 **Reviewer:** AI Code Assistant (GitHub Copilot)
-

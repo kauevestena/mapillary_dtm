@@ -4,6 +4,7 @@ HTML/Markdown report generation.
 from __future__ import annotations
 
 import datetime
+import html
 import json
 import os
 from typing import Mapping
@@ -38,7 +39,20 @@ def write_html(
                 "pre{background:#f7f7f7;padding:1rem;border:1px solid #ccc;overflow:auto;}</style>")
         f.write("</head><body>")
         f.write("<h1>DTM from Mapillary — QA Report</h1>")
-        f.write(f"<p>Generated: {datetime.datetime.utcnow().isoformat()}Z</p>")
+        generated = datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
+        f.write(f"<p>Generated: {generated}</p>")
+        qa_info = manifest.get("qa") if isinstance(manifest, Mapping) else None
+        if isinstance(qa_info, Mapping):
+            status = qa_info.get("status", "unknown")
+            policy = qa_info.get("policy", "unknown")
+            f.write(f"<p><strong>QA status:</strong> {html.escape(str(status))} "
+                    f"<strong>Policy:</strong> {html.escape(str(policy))}</p>")
+        warnings = manifest.get("warnings") if isinstance(manifest, Mapping) else None
+        if warnings:
+            f.write("<h2>Warnings</h2><ul>")
+            for warning in warnings:
+                f.write(f"<li>{html.escape(str(warning))}</li>")
+            f.write("</ul>")
 
         f.write("<h2>Manifest</h2><pre>")
         f.write(json.dumps(manifest, indent=2, default=_json_serializer))
@@ -58,7 +72,7 @@ def write_html(
         if artifact_paths:
             f.write("<h2>Artifacts</h2><ul>")
             for label, artefact in artifact_paths.items():
-                f.write(f"<li>{label}: <code>{artefact}</code></li>")
+                f.write(f"<li>{html.escape(str(label))}: <code>{html.escape(str(artefact))}</code></li>")
             f.write("</ul>")
 
         f.write("</body></html>")

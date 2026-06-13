@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Sequence, Tuple
 
@@ -27,6 +28,7 @@ except Exception:  # pragma: no cover - handled at runtime
 log = logging.getLogger(__name__)
 
 CacheResult = Dict[str, Dict[str, Dict[str, np.ndarray]]]
+DEFAULT_MONODEPTH_MODEL_ID = "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf"
 
 
 class _DepthAdapter:
@@ -34,6 +36,14 @@ class _DepthAdapter:
 
     def predict(self, frame: FrameMeta) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         raise NotImplementedError
+
+    def provenance(self) -> dict[str, str | None]:
+        return {
+            "source_type": "model",
+            "backend": self.__class__.__name__,
+            "model_id": None,
+            "model_revision": None,
+        }
 
 
 class _TorchDepthAdapter(_DepthAdapter):
@@ -45,6 +55,7 @@ class _TorchDepthAdapter(_DepthAdapter):
         self.loader = ImageryLoader(imagery_root)
         self.model = torch.jit.load(str(model_path), map_location=self.device)
         self.model.eval()
+        self.path = model_path
 
     def predict(self, frame: FrameMeta) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         image = self.loader.load_rgb(frame)
@@ -71,6 +82,81 @@ class _TorchDepthAdapter(_DepthAdapter):
         uncertainty = _estimate_uncertainty(depth)
         return depth, uncertainty
 
+    def provenance(self) -> dict[str, str | None]:
+        return {
+            "source_type": "model",
+            "backend": "torchscript",
+            "model_id": str(self.path),
+            "model_revision": None,
+        }
+
+
+class _TransformersDepthAdapter(_DepthAdapter):
+    def __init__(self, model_id: str, device: str, imagery_root: Optional[Path | str]) -> None:
+        if torch is None:  # pragma: no cover - handled upstream
+            raise RuntimeError("Torch not available for transformers depth adapter")
+        try:
+            from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("transformers is not available for depth adapter") from exc
+
+        self.device = torch.device(device)
+        self.loader = ImageryLoader(imagery_root)
+        self.model_id = model_id
+        self.revision = os.getenv("MONODEPTH_MODEL_REVISION")
+        self.cache_dir = os.getenv("DTM_MODEL_CACHE_DIR", "models/huggingface")
+        local_only = os.getenv("DTM_MODELS_LOCAL_ONLY", "1").lower() not in {"0", "false", "no"}
+        self.processor = AutoImageProcessor.from_pretrained(
+            model_id,
+            revision=self.revision,
+            cache_dir=self.cache_dir,
+            local_files_only=local_only,
+        )
+        self.model = AutoModelForDepthEstimation.from_pretrained(
+            model_id,
+            revision=self.revision,
+            cache_dir=self.cache_dir,
+            local_files_only=local_only,
+        ).to(self.device)
+        self.model.eval()
+
+    def predict(self, frame: FrameMeta) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        image = self.loader.load_rgb(frame)
+        if image is None:
+            return None
+        try:
+            from PIL import Image
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("Pillow is required for depth inference") from exc
+
+        pil_image = Image.fromarray(image)
+        inputs = self.processor(images=pil_image, return_tensors="pt")
+        inputs = {key: value.to(self.device) for key, value in inputs.items()}
+        with torch.inference_mode():
+            outputs = self.model(**inputs)
+            depth = outputs.predicted_depth
+            depth = torch.nn.functional.interpolate(
+                depth.unsqueeze(1),
+                size=(pil_image.height, pil_image.width),
+                mode="bicubic",
+                align_corners=False,
+            ).squeeze(0).squeeze(0)
+        arr = depth.detach().cpu().numpy().astype(np.float32, copy=False)
+        arr = np.where(np.isfinite(arr), arr, np.nan).astype(np.float32)
+        if not np.isfinite(arr).any():
+            return None
+        arr = np.clip(arr, 0.5, 120.0).astype(np.float32)
+        uncertainty = _estimate_uncertainty(arr)
+        return arr, uncertainty
+
+    def provenance(self) -> dict[str, str | None]:
+        return {
+            "source_type": "model",
+            "backend": "transformers-depth-anything",
+            "model_id": self.model_id,
+            "model_revision": self.revision,
+        }
+
 
 def predict_depths(
     seqs: Mapping[str, Sequence[FrameMeta]],
@@ -81,90 +167,181 @@ def predict_depths(
     adapter: Optional[_DepthAdapter] = None,
     imagery_root: Optional[Path | str] = None,
     use_gpu: Optional[bool] = None,
+    allow_synthetic: bool = True,
+    progress: bool | None = None,
 ) -> CacheResult:
     """Return (and cache) depth/uncertainty maps for each frame."""
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    if adapter is None:
-        adapter = _init_default_adapter(imagery_root=imagery_root, use_gpu=use_gpu)
+    adapter_initialized = adapter is not None
 
     results: CacheResult = {}
     rng = np.random.default_rng(seed)
+    require_provenance = not allow_synthetic
+    cached_count = 0
+    generated_count = 0
+    total_frames = sum(len(frames) for frames in seqs.values())
 
-    for seq_id, frames in seqs.items():
-        if not frames:
-            continue
+    with _progress_bar(total_frames, "Monodepth", progress) as pbar:
+        for seq_id, frames in seqs.items():
+            if not frames:
+                continue
 
-        frame_results: Dict[str, Dict[str, np.ndarray]] = {}
-        for index, frame in enumerate(frames):
-            cache_path = out_path / f"{frame.image_id}.npz"
-            depth: np.ndarray | None = None
-            uncert: np.ndarray | None = None
+            frame_results: Dict[str, Dict[str, np.ndarray]] = {}
+            for index, frame in enumerate(frames):
+                cache_path = out_path / f"{frame.image_id}.npz"
+                depth: np.ndarray | None = None
+                uncert: np.ndarray | None = None
+                provenance: dict[str, str | None] | None = None
 
-            if cache_path.exists() and not force:
-                depth, uncert = _load_cached_depth(cache_path)
+                if cache_path.exists() and not force:
+                    cached_depth, cached_uncert, cached_provenance = _load_cached_depth(
+                        cache_path,
+                        require_provenance=require_provenance,
+                    )
+                    depth, uncert, provenance = cached_depth, cached_uncert, cached_provenance
+                    if depth is not None and uncert is not None:
+                        cached_count += 1
+                        frame_results[frame.image_id] = {
+                            "depth": depth.astype(np.float32, copy=False),
+                            "uncertainty": uncert.astype(np.float32, copy=False),
+                        }
+                        _progress_update(
+                            pbar,
+                            cached=cached_count,
+                            generated=generated_count,
+                        )
+                        continue
 
-            if (depth is None or uncert is None) and adapter is not None:
-                try:
-                    prediction = adapter.predict(frame)
-                except Exception as exc:  # pragma: no cover - adapter failure
-                    log.warning("Depth adapter failed for %s: %s", frame.image_id, exc)
-                    prediction = None
-                if prediction is not None:
-                    depth, uncert = prediction
-                    depth = depth.astype(np.float32, copy=False)
-                    uncert = uncert.astype(np.float32, copy=False)
+                if not adapter_initialized:
+                    if _should_init_default_adapter(allow_synthetic=allow_synthetic):
+                        adapter = _init_default_adapter(imagery_root=imagery_root, use_gpu=use_gpu)
+                    adapter_initialized = True
 
-            if depth is None or uncert is None:
-                depth, uncert = _synthesize_depth(
-                    frame,
-                    resolution=resolution,
-                    rng=rng,
-                    frame_index=index,
+                if adapter is not None:
+                    try:
+                        prediction = adapter.predict(frame)
+                    except Exception as exc:  # pragma: no cover - adapter failure
+                        log.warning("Depth adapter failed for %s: %s", frame.image_id, exc)
+                        prediction = None
+                    if prediction is not None:
+                        depth, uncert = prediction
+                        depth = depth.astype(np.float32, copy=False)
+                        uncert = uncert.astype(np.float32, copy=False)
+                        depth, uncert = _downsample_prediction(depth, uncert, resolution)
+                        provenance = adapter.provenance()
+
+                if depth is None or uncert is None:
+                    if not allow_synthetic:
+                        raise RuntimeError(
+                            "Monodepth prediction unavailable and synthetic depth is disabled. "
+                            "Provide provenanced cached depth maps, set MONODEPTH_MODEL_PATH, "
+                            "or cache the configured Hugging Face depth model."
+                        )
+                    depth, uncert = _synthesize_depth(
+                        frame,
+                        resolution=resolution,
+                        rng=rng,
+                        frame_index=index,
+                    )
+                    provenance = {
+                        "source_type": "synthetic",
+                        "backend": "procedural",
+                        "model_id": None,
+                        "model_revision": None,
+                    }
+
+                _write_depth(cache_path, depth, uncert, provenance=provenance)
+                generated_count += 1
+
+                frame_results[frame.image_id] = {
+                    "depth": depth.astype(np.float32, copy=False),
+                    "uncertainty": uncert.astype(np.float32, copy=False),
+                }
+                _progress_update(
+                    pbar,
+                    cached=cached_count,
+                    generated=generated_count,
                 )
 
-            _write_depth(cache_path, depth, uncert)
-
-            frame_results[frame.image_id] = {
-                "depth": depth.astype(np.float32, copy=False),
-                "uncertainty": uncert.astype(np.float32, copy=False),
-            }
-
-        if frame_results:
-            results[seq_id] = frame_results
+            if frame_results:
+                results[seq_id] = frame_results
 
     return results
 
 
-def _load_cached_depth(path: Path) -> tuple[np.ndarray | None, np.ndarray | None]:
+class _NoProgress:
+    def __enter__(self) -> "_NoProgress":
+        return self
+
+    def __exit__(self, *args) -> None:
+        return None
+
+    def update(self, value: int = 1) -> None:
+        return None
+
+    def set_postfix(self, *args, **kwargs) -> None:
+        return None
+
+
+def _progress_bar(total: int, desc: str, enabled: bool | None):
+    if enabled is None:
+        try:
+            enabled = os.isatty(2)
+        except Exception:
+            enabled = False
+    if not enabled:
+        return nullcontext(_NoProgress())
+    try:
+        from tqdm.auto import tqdm
+    except Exception:  # pragma: no cover - optional display dependency
+        return nullcontext(_NoProgress())
+    return tqdm(total=total, desc=desc, unit="img")
+
+
+def _progress_update(pbar, *, cached: int, generated: int) -> None:
+    try:
+        pbar.update(1)
+        current = int(getattr(pbar, "n", getattr(pbar, "updates", 0)) or 0)
+        total = int(getattr(pbar, "total", 0) or 0)
+        if current == 1 or current % 50 == 0 or (total and current >= total):
+            pbar.set_postfix(cached=cached, generated=generated)
+    except Exception:
+        return None
+
+
+def _load_cached_depth(
+    path: Path,
+    *,
+    require_provenance: bool = False,
+) -> tuple[np.ndarray | None, np.ndarray | None, dict[str, str | None] | None]:
     try:
         with np.load(path) as data:
             depth = np.asarray(data.get("depth"), dtype=np.float32)
             uncert = np.asarray(data.get("uncertainty"), dtype=np.float32)
             if depth.ndim != 2 or depth.size == 0:
-                return None, None
+                return None, None, None
             if uncert.shape != depth.shape:
                 uncert = np.full_like(depth, 0.25, dtype=np.float32)
-            return depth, uncert
+            provenance = {
+                "source_type": _npz_scalar(data, "source_type"),
+                "backend": _npz_scalar(data, "backend"),
+                "model_id": _npz_scalar(data, "model_id"),
+                "model_revision": _npz_scalar(data, "model_revision"),
+            }
+            if require_provenance and provenance["source_type"] not in {"model", "external"}:
+                return None, None, None
+            return depth, uncert, provenance
     except Exception:
-        return None, None
+        return None, None, None
 
 
 def _init_default_adapter(
     imagery_root: Optional[Path | str],
     use_gpu: Optional[bool],
 ) -> Optional[_DepthAdapter]:
-    model_path = os.getenv("MONODEPTH_MODEL_PATH")
-    if not model_path:
-        return None
-
-    model_file = Path(model_path)
-    if not model_file.exists():
-        log.warning("MONODEPTH_MODEL_PATH=%s does not exist; skipping adapter", model_path)
-        return None
-
     if torch is None:
         log.warning("PyTorch not available; cannot load monodepth model")
         return None
@@ -186,11 +363,78 @@ def _init_default_adapter(
             log.info("MONODEPTH GPU requested but CUDA not available; using CPU")
         device = "cpu"
 
-    try:
-        return _TorchDepthAdapter(model_file, device, imagery_root)
-    except Exception as exc:
-        log.warning("Failed to initialize torch depth adapter: %s", exc)
+    model_path = os.getenv("MONODEPTH_MODEL_PATH")
+    if model_path:
+        model_file = Path(model_path)
+        if not model_file.exists():
+            log.warning("MONODEPTH_MODEL_PATH=%s does not exist; skipping adapter", model_path)
+            return None
+        try:
+            return _TorchDepthAdapter(model_file, device, imagery_root)
+        except Exception as exc:
+            log.warning("Failed to initialize torch depth adapter: %s", exc)
+            return None
+
+    model_id = os.getenv("MONODEPTH_MODEL_ID", DEFAULT_MONODEPTH_MODEL_ID)
+    if not model_id:
         return None
+    try:
+        return _TransformersDepthAdapter(model_id, device, imagery_root)
+    except Exception as exc:
+        log.warning("Failed to initialize transformers depth adapter: %s", exc)
+        return None
+
+
+def _should_init_default_adapter(*, allow_synthetic: bool) -> bool:
+    if os.getenv("MONODEPTH_MODEL_PATH"):
+        return True
+    if not allow_synthetic:
+        return True
+    return "MONODEPTH_MODEL_ID" in os.environ and bool(os.getenv("MONODEPTH_MODEL_ID"))
+
+
+def _downsample_prediction(
+    depth: np.ndarray,
+    uncert: np.ndarray,
+    resolution: tuple[int, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Downsample large model outputs to the cache resolution without upscaling."""
+    depth = np.asarray(depth, dtype=np.float32)
+    uncert = np.asarray(uncert, dtype=np.float32)
+    if depth.ndim != 2:
+        depth = depth.reshape(depth.shape[-2], depth.shape[-1])
+    if uncert.shape != depth.shape:
+        uncert = np.full_like(depth, 0.25, dtype=np.float32)
+    target_rows, target_cols = resolution
+    if depth.shape[0] <= target_rows and depth.shape[1] <= target_cols:
+        return depth, uncert
+    out_shape = (max(1, int(target_rows)), max(1, int(target_cols)))
+    return (
+        _resize_array(depth, out_shape).astype(np.float32, copy=False),
+        _resize_array(uncert, out_shape).astype(np.float32, copy=False),
+    )
+
+
+def _resize_array(arr: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    try:
+        import cv2  # type: ignore
+
+        return cv2.resize(
+            arr.astype(np.float32, copy=False),
+            (shape[1], shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
+    except Exception:
+        try:
+            from PIL import Image
+
+            image = Image.fromarray(arr.astype(np.float32, copy=False), mode="F")
+            image = image.resize((shape[1], shape[0]), resample=Image.Resampling.BILINEAR)
+            return np.asarray(image, dtype=np.float32)
+        except Exception:
+            rows = np.linspace(0, arr.shape[0] - 1, shape[0]).astype(int)
+            cols = np.linspace(0, arr.shape[1] - 1, shape[1]).astype(int)
+            return arr[np.ix_(rows, cols)].astype(np.float32, copy=False)
 
 
 def _normalize_depth(depth: np.ndarray) -> np.ndarray:
@@ -253,9 +497,38 @@ def _synthesize_depth(
     return depth.astype(np.float32), uncert.astype(np.float32)
 
 
-def _write_depth(path: Path, depth: np.ndarray, uncert: np.ndarray) -> None:
+def _write_depth(
+    path: Path,
+    depth: np.ndarray,
+    uncert: np.ndarray,
+    *,
+    provenance: Mapping[str, str | None] | None = None,
+) -> None:
+    provenance = dict(provenance or {})
     try:
-        np.savez_compressed(path, depth=depth, uncertainty=uncert)
+        np.savez_compressed(
+            path,
+            depth=depth,
+            uncertainty=uncert,
+            source_type=provenance.get("source_type") or "",
+            backend=provenance.get("backend") or "",
+            model_id=provenance.get("model_id") or "",
+            model_revision=provenance.get("model_revision") or "",
+        )
     except OSError:
         # Failing to cache should not break the pipeline; the caller can retry.
         pass
+
+
+def _npz_scalar(data, key: str) -> str | None:
+    if key not in data:
+        return None
+    value = data[key]
+    if getattr(value, "shape", ()) == ():
+        raw = value.item()
+    else:
+        raw = value
+    if raw is None:
+        return None
+    text = str(raw)
+    return text if text and text != "None" else None

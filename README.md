@@ -11,7 +11,8 @@
 Respect Mapillary's terms and attribution requirements. OSM data is © OpenStreetMap contributors. See `docs/ROADMAP.md` for QA steps and validation using official, held-out datasets.car sequences only), maximizing **accuracy via redundancy** and **cross-validation**. No existing DTM is used except optionally as **initialization/QA**. The pipeline focuses on **slope fidelity** (accessibility mapping).
 
 **Highlights**
-- Uses **two independent SfM stacks** (OpenSfM & COLMAP) + a **VO + mono-depth + ground plane-sweep** densifier for redundancy.
+- Uses **two independent SfM stacks** (OpenSfM & COLMAP) + a **Deep-Image-Matching (DIM)** densifier for redundancy. (Legacy OpenCV VO is available via `--legacy-vo`).
+- Fully **GPU-optimized** (CUDA 12.4 + FP16 + PyTorch batching) for Depth, Ground Masks, and COLMAP feature extraction.
 - **Sequence-constant camera height** constraint \(h \in [1, 3]\,m\) + **GNSS deltas** + **semantic footpoint anchors** to resolve metric scale.
 - **Ground-only** extraction by 3D semantic voting; **lower-envelope fusion** and **edge-aware smoothing** to preserve slope.
 - **OSM-based corridor** via **OSMnx** to bound processing to street vicinity; **TIN fill** to extend from corridor into the full AOI with **max 5 m** extrapolation and always fill **inner blocks**.
@@ -97,14 +98,19 @@ dtm_from_mapillary/
 ## Quickstart
 
 1. **Provision the environment**:
-   - Follow `docs/runtime_environment.md` for system packages and external tools.
-   - Create a fresh virtualenv and install core dependencies:
+   - The easiest way is to use the provided setup script which will handle virtualenv creation, submodule init, and CUDA PyTorch installation:
+   ```bash
+   ./setup_local.sh
+   source .venv/bin/activate
+   ```
+   - Alternatively, install manually:
    ```bash
    pip install -r requirements.txt
    ```
    - Optional extras:
      ```bash
      pip install -r requirements-optional.txt    # ML acceleration (PyTorch)
+     pip install -r requirements-dim.txt         # Deep-Image-Matching support
      pip install -r requirements-dev.txt         # Developer tools + tests
      ```
 
@@ -190,14 +196,14 @@ dtm_from_mapillary/
    ```
    > Defaults: `--colmap-threads 8`, `--no-colmap-use-gpu`
 
-   **Optional: Disable imagery-backed VO (synthetic fallback):**
+   **Optional: Use Legacy OpenCV VO instead of DIM:**
    ```bash
    python -m dtm_from_mapillary.cli.pipeline run \
      --aoi-bbox "-122.45,37.76,-122.41,37.79" \
      --out-dir ./out \
-     --vo-force-synthetic
+     --legacy-vo
    ```
-   > VO now consumes cached Mapillary thumbnails when available. Provide imagery via `scripts/download_sample_data.py` or the cache flags above for best results.
+   > By default, the pipeline uses Deep-Image-Matching (SuperPoint+LightGlue) for Track C. Use `--legacy-vo` to fall back to the lightweight CPU-bound OpenCV ORB tracker.
 
    **Optional: Run monodepth with a real model (TorchScript):**
    ```bash

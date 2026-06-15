@@ -67,26 +67,32 @@ def sweep(
     alphas = np.linspace(0.0, 1.0, samples_along, dtype=np.float32)
     offsets = np.asarray(list(lateral_offsets), dtype=np.float32)
 
-    pts: list[np.ndarray] = []
-    wts: list[float] = []
+    # Vectorized point generation using meshgrid
+    alpha_grid, offset_grid = np.meshgrid(alphas, offsets, indexing='ij')
+    
+    # Centers shape: (samples_along, 1, 3)
+    # Lateral shape: (1, offsets, 3)
+    alpha_expanded = alpha_grid[..., np.newaxis]
+    centers = (1.0 - alpha_expanded) * p0 + alpha_expanded * p1
+    
+    offset_expanded = offset_grid[..., np.newaxis]
+    lateral_shift = lateral * offset_expanded
+    
+    pts_grid = centers + lateral_shift
+    pts_grid[..., 2] = ground_z
+    
+    # Vectorized weights
+    center_weight = 1.0 - np.abs(alpha_grid - 0.5) * 1.6
+    lane_weight = 1.0 - np.abs(offset_grid) / (max(np.abs(offsets).max(), 1e-3) * 1.5)
+    weights_grid = np.clip(0.4 + 0.6 * center_weight * lane_weight, 0.0, 1.0)
+    
+    pts = pts_grid.reshape(-1, 3).astype(np.float32)
+    wts = weights_grid.reshape(-1).astype(np.float32)
 
-    for alpha in alphas:
-        center = (1.0 - alpha) * p0 + alpha * p1
-        for offset in offsets:
-            pt = center + lateral * float(offset)
-            pt[2] = ground_z
-            pts.append(pt.astype(np.float32))
-
-            # Confidence is higher closer to the middle and near the lane center.
-            center_weight = 1.0 - abs(alpha - 0.5) * 1.6
-            lane_weight = 1.0 - abs(offset) / (max(abs(offsets).max(), 1e-3) * 1.5)
-            weight = float(np.clip(0.4 + 0.6 * center_weight * lane_weight, 0.0, 1.0))
-            wts.append(weight)
-
-    if not pts:
+    if pts.size == 0:
         return SweepResult(
             points=np.zeros((0, 3), dtype=np.float32),
             weights=np.zeros((0,), dtype=np.float32),
         )
 
-    return SweepResult(points=np.vstack(pts), weights=np.asarray(wts, dtype=np.float32))
+    return SweepResult(points=pts, weights=wts)

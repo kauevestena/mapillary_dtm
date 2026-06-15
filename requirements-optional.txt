@@ -1,8 +1,12 @@
 # Optional ML / acceleration stack
-# Install with: pip install -r requirements-optional.txt
+# Install with:
+#   pip install -r requirements-optional.txt --index-url https://download.pytorch.org/whl/cu124
+#
+# For CPU-only (no GPU):
+#   pip install -r requirements-optional.txt
 
-torch==2.2.0
-torchvision==0.17.0
+torch>=2.5
+torchvision>=0.20
 transformers>=4.45
 huggingface_hub
 safetensors

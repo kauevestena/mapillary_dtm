@@ -4,6 +4,11 @@ Change values here to tune behavior without touching the modules.
 """
 import os
 
+# ── GPU / acceleration ──────────────────────────────────────────────
+GPU_AUTO_DETECT: bool = True  # Auto-detect CUDA/MPS; set False to force CPU
+MONODEPTH_BATCH_SIZE: int = 4  # Frames per GPU batch for depth inference
+GROUND_MASK_BATCH_SIZE: int = 4  # Frames per GPU batch for segmentation
+
 # Spatial resolution
 GRID_RES_M: float = 0.5
 TILE_SIZE_M: int = 512
@@ -41,7 +46,9 @@ MIN_TRIANG_ANGLE_DEG: float = 2.0
 RANSAC_THRESH_PX: float = 1.0
 LO_WINDOW_N: int = 5
 COLMAP_DEFAULT_THREADS: int = 8
-COLMAP_USE_GPU: bool = False
+COLMAP_USE_GPU: bool = os.getenv("COLMAP_USE_GPU", "").strip() in {"1", "true", "True", "TRUE"} or (
+    os.getenv("COLMAP_USE_GPU") is None  # auto-detect when not explicitly set
+)
 VO_ORB_FEATURES: int = 2000
 VO_MIN_INLIERS: int = 35
 VO_RANSAC_THRESH: float = 1.0
@@ -109,6 +116,14 @@ MAPILLARY_CACHE_ROOT = os.getenv(
 MAPILLARY_METADATA_CACHE_MAX_GB = 2.0
 MAPILLARY_IMAGERY_CACHE_MAX_GB = 8.0
 MAPILLARY_DEFAULT_IMAGE_RES = 1024
+
+# ── Deep-Image-Matching (DIM) ───────────────────────────────────────
+DIM_ENABLED: bool = True  # DIM is the default matching backend
+DIM_EXTRACTOR: str = os.getenv("DIM_EXTRACTOR", "superpoint")  # superpoint | aliked | sift | orb
+DIM_MATCHER: str = os.getenv("DIM_MATCHER", "lightglue")  # lightglue | superglue | nn
+DIM_TILE_SIZE: int = 2048  # for high-resolution images
+DIM_MAX_FEATURES: int = 8192
+DIM_QUALITY: str = "high"  # low | medium | high | highest
 
 # sample region bbox (for testing):
 # min_lon, min_lat, max_lon, max_lat = -48.596644,-27.591363,-48.589890,-27.586780

@@ -31,6 +31,7 @@ from ..geom.anchors import find_anchors
 from ..geom.height_solver import solve_scale_and_h
 from ..geom.sfm_colmap import run as run_colmap
 from ..geom.sfm_opensfm import run as run_opensfm
+from ..geom.sfm_dim import run as run_dim
 from ..geom.vo_simplified import run as run_vo
 from ..ground.corridor_fill_tin import (
     build_tin,
@@ -259,6 +260,7 @@ def run_pipeline(
     imagery_per_sequence: int = 5,
     colmap_threads: int = constants.COLMAP_DEFAULT_THREADS,
     colmap_use_gpu: bool = constants.COLMAP_USE_GPU,
+    legacy_vo: bool = False,
     vo_force_synthetic: bool = False,
     vo_min_inliers: Optional[int] = None,
     resume: bool = True,
@@ -304,6 +306,8 @@ def run_pipeline(
         Thread budget for COLMAP feature extraction / reconstruction.
     colmap_use_gpu : bool
         Enable COLMAP GPU paths (requires CUDA build).
+    legacy_vo : bool
+        Use the legacy OpenCV ORB VO pipeline instead of Deep-Image-Matching.
     vo_force_synthetic : bool
         Force the legacy synthetic VO path (skip OpenCV pipeline).
     vo_min_inliers : int, optional
@@ -485,20 +489,33 @@ def run_pipeline(
     )
     timings["colmap_s"] = time.perf_counter() - t0
     t0 = time.perf_counter()
-    vo = _run_stage(
-        run_state,
-        "vo",
-        lambda: run_vo(
-            seqs,
-            imagery_root=imagery_root_path,
-            force_synthetic=vo_force_synthetic,
-            min_inliers=vo_min_inliers,
-            allow_synthetic=allow_synthetic,
-            progress=progress_enabled,
-        ),
-        inputs={"force_synthetic": vo_force_synthetic, "min_inliers": vo_min_inliers},
-        counts=lambda result: _reconstruction_counts(result),
-    )
+    t0 = time.perf_counter()
+    if not legacy_vo and constants.DIM_ENABLED:
+        vo = _run_stage(
+            run_state,
+            "vo",
+            lambda: run_dim(
+                seqs,
+                imagery_root=imagery_root_path,
+                progress=progress_enabled,
+            ),
+            counts=lambda result: _reconstruction_counts(result),
+        )
+    else:
+        vo = _run_stage(
+            run_state,
+            "vo",
+            lambda: run_vo(
+                seqs,
+                imagery_root=imagery_root_path,
+                force_synthetic=vo_force_synthetic,
+                min_inliers=vo_min_inliers,
+                allow_synthetic=allow_synthetic,
+                progress=progress_enabled,
+            ),
+            inputs={"force_synthetic": vo_force_synthetic, "min_inliers": vo_min_inliers},
+            counts=lambda result: _reconstruction_counts(result),
+        )
     timings["vo_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -936,6 +953,10 @@ if typer is not None:
             constants.COLMAP_USE_GPU,
             help="Enable COLMAP GPU paths (requires CUDA-enabled build).",
         ),
+        legacy_vo: bool = typer.Option(
+            False,
+            help="Use the legacy OpenCV ORB VO pipeline instead of Deep-Image-Matching.",
+        ),
         vo_force_synthetic: bool = typer.Option(
             False,
             help="Force the legacy synthetic VO path (skip imagery-backed VO).",
@@ -1006,6 +1027,7 @@ if typer is not None:
             imagery_per_sequence=imagery_per_sequence,
             colmap_threads=colmap_threads,
             colmap_use_gpu=colmap_use_gpu,
+            legacy_vo=legacy_vo,
             vo_force_synthetic=vo_force_synthetic,
             vo_min_inliers=vo_min_inliers,
             resume=resume,

@@ -284,6 +284,8 @@ def optional_checks() -> List[Check]:
         Check("huggingface_hub", False, check_module("huggingface_hub", hint="install from requirements-optional.txt")),
         Check("safetensors", False, check_module("safetensors", hint="install from requirements-optional.txt")),
         Check("Pillow", False, check_module("PIL", hint="install from requirements-optional.txt")),
+        Check("deep_image_matching", False, check_module("deep_image_matching", hint="install from requirements-dim.txt")),
+        Check("pycolmap", False, check_module("pycolmap", hint="install from requirements-dim.txt")),
         Check("CUDA toolchain", False, check_cuda),
         Check("nvidia-smi", False, check_command("nvidia-smi", hint="install NVIDIA driver")),
     ]
@@ -379,6 +381,14 @@ def main() -> int:
         print(json.dumps(rows, indent=2))
     else:
         render_table(rows)
+        if args.full:
+            try:
+                from dtm_from_mapillary.gpu import gpu_summary
+                print("\nGPU Configuration Summary:")
+                for k, v in gpu_summary().items():
+                    print(f"  {k}: {v}")
+            except ImportError:
+                pass
     return 0 if required_ok else 1
 
 

@@ -29,34 +29,26 @@ def edge_aware(dtm: np.ndarray) -> np.ndarray:
 
 
 def _smooth_iteration(arr: np.ndarray, mask: np.ndarray, sigma: float) -> np.ndarray:
-    out = arr.copy()
     height, width = arr.shape
     inv_two_sigma2 = 1.0 / max(2.0 * sigma * sigma, 1e-6)
 
-    for y in range(height):
-        for x in range(width):
-            if not mask[y, x]:
-                continue
-            base = float(arr[y, x])
-            total = base
-            weight_sum = 1.0
+    pad_arr = np.pad(arr, pad_width=1, mode='edge')
+    pad_mask = np.pad(mask, pad_width=1, mode='constant', constant_values=False)
+    
+    total = np.zeros_like(arr)
+    weight_sum = np.zeros_like(arr)
 
-            y0 = max(0, y - 1)
-            y1 = min(height - 1, y + 1)
-            x0 = max(0, x - 1)
-            x1 = min(width - 1, x + 1)
+    for dy in [-1, 0, 1]:
+        for dx in [-1, 0, 1]:
+            neigh_arr = pad_arr[1+dy:height+1+dy, 1+dx:width+1+dx]
+            neigh_mask = pad_mask[1+dy:height+1+dy, 1+dx:width+1+dx]
+            
+            diff = neigh_arr - arr
+            w = np.exp(-(diff * diff) * inv_two_sigma2)
+            w = np.where(neigh_mask, w, 0.0)
+            
+            total += neigh_arr * w
+            weight_sum += w
 
-            for ny in range(y0, y1 + 1):
-                for nx in range(x0, x1 + 1):
-                    if nx == x and ny == y:
-                        continue
-                    if not mask[ny, nx]:
-                        continue
-                    diff = float(arr[ny, nx] - base)
-                    w = math.exp(-(diff * diff) * inv_two_sigma2)
-                    total += float(arr[ny, nx]) * w
-                    weight_sum += w
-
-            out[y, x] = float(total / weight_sum)
-
+    out = np.where(mask & (weight_sum > 0), total / weight_sum, arr)
     return out

@@ -1,0 +1,6 @@
+# Deep-Image-Matching integration (optional)
+# Install with: pip install -r requirements-dim.txt
+git+https://github.com/3DOM-FBK/deep-image-matching.git
+pycolmap
+kornia<0.8.0
+h5py

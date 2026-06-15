@@ -229,6 +229,15 @@ class COLMAPRunner:
                 str(self.config.threads),
             ],
         ]
+        # GPU-specific enhancements: more features + explicit GPU index
+        if self.config.use_gpu:
+            commands[0].extend([
+                "--SiftExtraction.max_num_features", "8192",
+                "--SiftExtraction.gpu_index", self.config.gpu_index,
+            ])
+            commands[1].extend([
+                "--SiftMatching.gpu_index", self.config.gpu_index,
+            ])
         for command in commands:
             try:
                 self._run_colmap(command, workspace=workspace, timeout=timeout)

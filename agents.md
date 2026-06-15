@@ -10,7 +10,7 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 - Processes Mapillary street-level imagery (car sequences only)
 - Generates 0.5m resolution ground-only DTMs with ellipsoidal heights
 - Produces slope maps optimized for accessibility mapping
-- Uses triple-redundancy approach (OpenSfM + COLMAP + VO/mono-depth)
+- Uses triple-redundancy approach (OpenSfM + COLMAP + DIM/VO/mono-depth)
 - Focuses on slope fidelity and cross-validation
 - Implements OSM-based corridor processing with TIN extrapolation
 
@@ -36,8 +36,8 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 
 ## 🧰 Environment & Tooling
 
-- **Virtual environment (`.venv`)**: Always work inside the repository-local virtual environment `.venv`. If it is missing, create it with `python3 -m venv .venv` and install dependencies via `.venv/bin/pip install -r requirements.txt`. All commands (CLI, scripts, tests, linting) should be executed through `.venv/bin/python` to guarantee consistent dependency usage.
-- **Python version**: 3.10+ (actively tested on 3.12).
+- **Virtual environment (`.venv`)**: Always work inside the repository-local virtual environment `.venv`. If it is missing, create it by running `./setup_local.sh`. All commands (CLI, scripts, tests, linting) should be executed through `.venv/bin/python` to guarantee consistent dependency usage.
+- **Python version**: 3.10+ (actively tested on 3.13).
 - **Key packages**: `numpy`, `scipy`, `pyproj`, `shapely`, `rasterio`, `geopandas`, `osmnx`, `opencv-python`, `scikit-image`, `laspy[lazrs]`, `pytest`, plus optional `torch` / `torchvision` for mono-depth experiments.
 
 ---
@@ -62,7 +62,8 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 ### `geom/` - Geometric Reconstruction (Triple Track)
 - **Track A**: `sfm_opensfm.py` - Full OpenSfM reconstruction
 - **Track B**: `sfm_colmap.py` - Independent COLMAP reconstruction  
-- **Track C**: `vo_simplified.py` - Up-to-scale visual odometry chain
+- **Track C**: `sfm_dim.py` / `dim_adapter.py` - Deep-Image-Matching (SuperPoint/LightGlue) + COLMAP mapper
+- **Legacy Track C**: `vo_simplified.py` - Up-to-scale visual odometry chain (fallback)
 - **`height_solver.py`**: Per-sequence metric scale + camera height solver (1-3m range)
 - **`anchors.py`**: Vertical object footpoint triangulation from Mapillary detections
 - **`utils.py`**: Shared geometry utilities

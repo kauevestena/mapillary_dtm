@@ -25,6 +25,13 @@ try:  # Optional dependency for real depth inference
 except Exception:  # pragma: no cover - handled at runtime
     torch = None
 
+try:
+    from ..gpu import detect_device, get_optimal_dtype, configure_torch_defaults
+except Exception:  # pragma: no cover
+    detect_device = None  # type: ignore[assignment]
+    get_optimal_dtype = None  # type: ignore[assignment]
+    configure_torch_defaults = None  # type: ignore[assignment]
+
 log = logging.getLogger(__name__)
 
 CacheResult = Dict[str, Dict[str, Dict[str, np.ndarray]]]
@@ -52,9 +59,13 @@ class _TorchDepthAdapter(_DepthAdapter):
             raise RuntimeError("Torch not available for depth adapter")
 
         self.device = torch.device(device)
+        self.dtype = get_optimal_dtype(device) if get_optimal_dtype else torch.float32
         self.loader = ImageryLoader(imagery_root)
         self.model = torch.jit.load(str(model_path), map_location=self.device)
         self.model.eval()
+        if self.dtype == torch.float16 and self.device.type == "cuda":
+            self.model = self.model.half()
+            log.info("TorchScript depth model: FP16 inference on %s", self.device)
         self.path = model_path
 
     def predict(self, frame: FrameMeta) -> Optional[Tuple[np.ndarray, np.ndarray]]:
@@ -67,7 +78,7 @@ class _TorchDepthAdapter(_DepthAdapter):
             tensor = tensor.unsqueeze(0)
         else:
             tensor = tensor.permute(2, 0, 1)
-        tensor = tensor.unsqueeze(0).to(self.device)
+        tensor = tensor.unsqueeze(0).to(device=self.device, dtype=self.dtype)
 
         with torch.inference_mode():
             prediction = self.model(tensor)
@@ -75,7 +86,7 @@ class _TorchDepthAdapter(_DepthAdapter):
         if isinstance(prediction, (list, tuple)):
             prediction = prediction[0]
 
-        depth = prediction.squeeze().detach().cpu().numpy().astype(np.float32, copy=False)
+        depth = prediction.squeeze().detach().float().cpu().numpy().astype(np.float32, copy=False)
         if depth.ndim != 2:
             depth = depth.reshape(depth.shape[-2], depth.shape[-1])
         depth = _normalize_depth(depth)
@@ -101,6 +112,7 @@ class _TransformersDepthAdapter(_DepthAdapter):
             raise RuntimeError("transformers is not available for depth adapter") from exc
 
         self.device = torch.device(device)
+        self.dtype = get_optimal_dtype(device) if get_optimal_dtype else torch.float32
         self.loader = ImageryLoader(imagery_root)
         self.model_id = model_id
         self.revision = os.getenv("MONODEPTH_MODEL_REVISION")
@@ -117,8 +129,11 @@ class _TransformersDepthAdapter(_DepthAdapter):
             revision=self.revision,
             cache_dir=self.cache_dir,
             local_files_only=local_only,
+            torch_dtype=self.dtype,
         ).to(self.device)
         self.model.eval()
+        if self.dtype == torch.float16 and self.device.type == "cuda":
+            log.info("Transformers depth model: FP16 inference on %s", self.device)
 
     def predict(self, frame: FrameMeta) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         image = self.loader.load_rgb(frame)
@@ -131,7 +146,7 @@ class _TransformersDepthAdapter(_DepthAdapter):
 
         pil_image = Image.fromarray(image)
         inputs = self.processor(images=pil_image, return_tensors="pt")
-        inputs = {key: value.to(self.device) for key, value in inputs.items()}
+        inputs = {key: value.to(device=self.device, dtype=self.dtype if value.is_floating_point() else value.dtype) for key, value in inputs.items()}
         with torch.inference_mode():
             outputs = self.model(**inputs)
             depth = outputs.predicted_depth
@@ -141,7 +156,7 @@ class _TransformersDepthAdapter(_DepthAdapter):
                 mode="bicubic",
                 align_corners=False,
             ).squeeze(0).squeeze(0)
-        arr = depth.detach().cpu().numpy().astype(np.float32, copy=False)
+        arr = depth.detach().float().cpu().numpy().astype(np.float32, copy=False)
         arr = np.where(np.isfinite(arr), arr, np.nan).astype(np.float32)
         if not np.isfinite(arr).any():
             return None
@@ -346,22 +361,20 @@ def _init_default_adapter(
         log.warning("PyTorch not available; cannot load monodepth model")
         return None
 
+    # Centralised GPU detection: auto-detect CUDA unless explicitly overridden.
     device_env = os.getenv("MONODEPTH_DEVICE")
-    gpu_env = os.getenv("MONODEPTH_USE_GPU")
-    gpu_requested = (
-        use_gpu
-        if use_gpu is not None
-        else gpu_env is not None and gpu_env.lower() in {"1", "true", "yes"}
-    )
-
     if device_env:
         device = device_env
-    elif gpu_requested and torch.cuda.is_available():  # type: ignore[attr-defined]
+    elif detect_device is not None:
+        device = detect_device(prefer_gpu=use_gpu)
+    elif use_gpu and torch.cuda.is_available():  # type: ignore[attr-defined]
         device = "cuda"
     else:
-        if gpu_requested and not torch.cuda.is_available():  # type: ignore[attr-defined]
-            log.info("MONODEPTH GPU requested but CUDA not available; using CPU")
         device = "cpu"
+
+    # Apply global PyTorch perf defaults (TF32, cuDNN benchmark, etc.)
+    if configure_torch_defaults is not None:
+        configure_torch_defaults()
 
     model_path = os.getenv("MONODEPTH_MODEL_PATH")
     if model_path:

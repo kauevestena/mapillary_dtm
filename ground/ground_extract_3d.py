@@ -276,80 +276,76 @@ def _evaluate_candidates(
     candidates: Iterable[Tuple[np.ndarray, float, str]],
 ) -> List[GroundPoint]:
     results: List[GroundPoint] = []
-    if not candidates:
+    
+    cand_list = list(candidates)
+    if not cand_list:
         return results
-
-    for point, base_uncert, method in candidates:
-        gp = _classify_point(
-            seq_id,
-            point,
-            method,
-            frames,
-            centers,
-            mask_priors,
-            base_uncertainty=base_uncert,
-        )
-        if gp is not None:
-            results.append(gp)
+        
+    valid_frames = [f for f in frames if f.image_id in centers]
+    if not valid_frames:
+        return results
+        
+    cam_centers = np.array([centers[f.image_id] for f in valid_frames])
+    cam_priors = np.array([mask_priors.get(f.image_id, 0.65) for f in valid_frames])
+    cam_ids = [f.image_id for f in valid_frames]
+    
+    cand_pts = np.array([c[0] for c in cand_list])
+    cand_uncert = np.array([c[1] for c in cand_list])
+    cand_method = [c[2] for c in cand_list]
+    
+    import scipy.spatial
+    tree = scipy.spatial.cKDTree(cam_centers[:, :2])
+    indices_list = tree.query_ball_point(cand_pts[:, :2], r=SUPPORT_RADIUS_M)
+    
+    for i, indices in enumerate(indices_list):
+        if len(indices) < 2:
+            continue
+            
+        point = cand_pts[i]
+        ground_z = point[2]
+        
+        subset_centers = cam_centers[indices]
+        dz = ground_z - (subset_centers[:, 2] - ASSUMED_CAM_HEIGHT)
+        valid_dz = np.abs(dz) <= 1.8
+        
+        valid_indices = np.array(indices)[valid_dz]
+        if len(valid_indices) < 2:
+            continue
+            
+        subset_centers = cam_centers[valid_indices]
+        dist_2d = np.linalg.norm(point[:2] - subset_centers[:, :2], axis=1)
+        weights = np.maximum(0.1, 1.0 - (dist_2d / SUPPORT_RADIUS_M))
+        probs = cam_priors[valid_indices]
+        
+        sem_prob = float(np.clip(np.average(probs, weights=weights), 0.0, 1.0))
+        if sem_prob < 0.5:
+            continue
+            
+        sort_idx = np.argsort(-weights)
+        top_indices = valid_indices[sort_idx[:5]]
+        image_ids = [cam_ids[idx] for idx in top_indices]
+        
+        tri_angle = _triangulation_angle(point, image_ids, centers)
+        if tri_angle is not None and tri_angle < constants.MIN_TRIANG_ANGLE_DEG * 0.5:
+            continue
+            
+        view_count = len(image_ids)
+        uncertainty = _estimate_uncertainty(tri_angle, view_count, sem_prob, cand_uncert[i])
+        
+        results.append(GroundPoint(
+            x=float(point[0]),
+            y=float(point[1]),
+            z=float(point[2]),
+            method=str(cand_method[i]),
+            seq_id=seq_id,
+            image_ids=image_ids,
+            view_count=view_count,
+            sem_prob=sem_prob,
+            tri_angle_deg=None if tri_angle is None else float(tri_angle),
+            uncertainty_m=float(uncertainty),
+        ))
+        
     return results
-
-
-def _classify_point(
-    seq_id: str,
-    point: np.ndarray,
-    method: str,
-    frames: Sequence[FrameMeta],
-    centers: Mapping[str, np.ndarray],
-    mask_priors: Mapping[str, float],
-    base_uncertainty: float,
-) -> GroundPoint | None:
-    supports: List[Tuple[str, float, float]] = []
-    ground_z = point[2]
-
-    for frame in frames:
-        center = centers.get(frame.image_id)
-        if center is None:
-            continue
-        dz = ground_z - (center[2] - ASSUMED_CAM_HEIGHT)
-        if abs(dz) > 1.8:
-            continue
-        horizontal = np.linalg.norm(point[:2] - center[:2])
-        if horizontal > SUPPORT_RADIUS_M:
-            continue
-        weight = 1.0 - (horizontal / SUPPORT_RADIUS_M)
-        prob = mask_priors.get(frame.image_id, 0.65)
-        supports.append((frame.image_id, prob, max(0.1, weight)))
-
-    if len(supports) < 2:
-        return None
-
-    weights = np.asarray([w for _, _, w in supports], dtype=np.float32)
-    probs = np.asarray([p for _, p, _ in supports], dtype=np.float32)
-    sem_prob = float(np.clip(np.average(probs, weights=weights), 0.0, 1.0))
-    if sem_prob < 0.5:
-        return None
-
-    supports.sort(key=lambda item: item[2], reverse=True)
-    image_ids = [item[0] for item in supports[:5]]
-    tri_angle = _triangulation_angle(point, image_ids, centers)
-    if tri_angle is not None and tri_angle < constants.MIN_TRIANG_ANGLE_DEG * 0.5:
-        return None
-
-    view_count = len(image_ids)
-    uncertainty = _estimate_uncertainty(tri_angle, view_count, sem_prob, base_uncertainty)
-
-    return GroundPoint(
-        x=float(point[0]),
-        y=float(point[1]),
-        z=float(point[2]),
-        method=str(method),
-        seq_id=seq_id,
-        image_ids=image_ids,
-        view_count=view_count,
-        sem_prob=sem_prob,
-        tri_angle_deg=None if tri_angle is None else float(tri_angle),
-        uncertainty_m=float(uncertainty),
-    )
 
 
 def _mask_prior(mask: np.ndarray | None) -> float:

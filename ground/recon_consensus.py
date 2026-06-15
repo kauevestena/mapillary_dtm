@@ -33,77 +33,74 @@ def agree(
     grid = float(grid_res or constants.GRID_RES_M)
     dz_thr = float(dz_max or constants.DZ_MAX_M)
 
-    buckets: Dict[Tuple[int, int], List[Tuple[str, GroundPoint]]] = defaultdict(list)
+    import pandas as pd
 
+    data = []
     def _accumulate(points: Sequence[GroundPoint] | None, label: str) -> None:
         if not points:
             return
         for gp in points:
             if gp is None:
                 continue
-            ix = int(np.floor(gp.x / grid))
-            iy = int(np.floor(gp.y / grid))
-            buckets[(ix, iy)].append((label, gp))
+            data.append({
+                "ix": int(np.floor(gp.x / grid)),
+                "iy": int(np.floor(gp.y / grid)),
+                "label": label,
+                "x": gp.x, "y": gp.y, "z": gp.z,
+                "uncertainty_m": gp.uncertainty_m,
+                "sem_prob": gp.sem_prob,
+                "tri_angle_deg": gp.tri_angle_deg
+            })
 
     _accumulate(ptsA, "A")
     _accumulate(ptsB, "B")
     _accumulate(ptsC, "C")
 
+    if not data:
+        return []
+
+    df = pd.DataFrame(data)
+    
+    # Vectorized filtering: only keep grid cells with at least 2 distinct sources
+    grouped = df.groupby(["ix", "iy"])
+    filtered_df = df[grouped["label"].transform("nunique") >= 2]
+
     consensus: List[ConsensusPoint] = []
-    for (ix, iy), records in buckets.items():
-        if len(records) < 2:
-            continue
+    if filtered_df.empty:
+        return consensus
 
-        by_source: Dict[str, List[GroundPoint]] = defaultdict(list)
-        for label, gp in records:
-            by_source[label].append(gp)
-
-        if len(by_source) < 2:
-            continue
-
-        source_heights = {
-            label: np.mean([gp.z for gp in items]) for label, items in by_source.items()
-        }
-
-        agreeing_sources = _sources_within_threshold(source_heights, dz_thr)
+    for (ix, iy), group in filtered_df.groupby(["ix", "iy"]):
+        by_source = group.groupby("label")["z"].mean().to_dict()
+        
+        agreeing_sources = _sources_within_threshold(by_source, dz_thr)
         if len(agreeing_sources) < 2:
             continue
 
-        supporting_points = [
-            gp
-            for label, gps in by_source.items()
-            if label in agreeing_sources
-            for gp in gps
-        ]
-        if not supporting_points:
+        supporting = group[group["label"].isin(agreeing_sources)]
+        if supporting.empty:
             continue
 
-        xyz = np.array([[gp.x, gp.y, gp.z] for gp in supporting_points], dtype=np.float64)
-        weights = np.clip(
-            np.array([1.0 / max(gp.uncertainty_m, 1e-3) for gp in supporting_points], dtype=np.float64),
-            0.1,
-            20.0,
-        )
+        weights = np.clip(1.0 / np.maximum(supporting["uncertainty_m"], 1e-3), 0.1, 20.0)
+        z_pct = np.percentile(supporting["z"], constants.LOWER_ENVELOPE_Q * 100.0)
+        
+        centroid_x = np.average(supporting["x"], weights=weights)
+        centroid_y = np.average(supporting["y"], weights=weights)
+        avg_sem = np.average(supporting["sem_prob"], weights=weights)
+        avg_unc = np.average(supporting["uncertainty_m"], weights=weights)
+        
+        tri_angles = supporting["tri_angle_deg"].dropna()
+        tri_angle = tri_angles.mean() if not tri_angles.empty else None
 
-        z_percentile = float(np.percentile(xyz[:, 2], constants.LOWER_ENVELOPE_Q * 100.0))
-        centroid = np.average(xyz[:, :2], axis=0, weights=weights)
-        avg_sem = float(np.average([gp.sem_prob for gp in supporting_points], weights=weights))
-        avg_unc = float(np.average([gp.uncertainty_m for gp in supporting_points], weights=weights))
-        tri_values = [gp.tri_angle_deg for gp in supporting_points if gp.tri_angle_deg is not None]
-        tri_angle = float(np.mean(tri_values)) if tri_values else None
-
-        consensus.append(
-            {
-                "x": float(centroid[0]),
-                "y": float(centroid[1]),
-                "z": z_percentile,
-                "sources": sorted(agreeing_sources),
-                "support": len(supporting_points),
-                "sem_prob": float(np.clip(avg_sem, 0.0, 1.0)),
-                "uncertainty": float(np.clip(avg_unc, 0.05, 0.6)),
-                "tri_angle_deg": tri_angle,
-            }
-        )
+        consensus.append({
+            "x": float(centroid_x),
+            "y": float(centroid_y),
+            "z": float(z_pct),
+            "sources": sorted(agreeing_sources),
+            "support": len(supporting),
+            "sem_prob": float(np.clip(avg_sem, 0.0, 1.0)),
+            "uncertainty": float(np.clip(avg_unc, 0.05, 0.6)),
+            "tri_angle_deg": float(tri_angle) if pd.notna(tri_angle) else None,
+        })
 
     return consensus
 

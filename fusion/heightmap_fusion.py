@@ -71,57 +71,55 @@ def fuse(
     height = max(1, iy_max - iy_min + 1)
     grid = GridSpec(ix_min=ix_min, iy_min=iy_min, width=width, height=height, res=res)
 
-    height_lists: Dict[Tuple[int, int], List[float]] = defaultdict(list)
-    weight_lists: Dict[Tuple[int, int], List[float]] = defaultdict(list)
-    sem_lists: Dict[Tuple[int, int], List[float]] = defaultdict(list)
-    src_counts: Dict[Tuple[int, int], List[int]] = defaultdict(list)
+    import pandas as pd
 
-    for pt in points:
-        x = float(pt["x"])
-        y = float(pt["y"])
-        z = float(pt["z"])
-        sources = pt.get("sources") or []
-        sem_prob = float(pt.get("sem_prob", 0.7))
-        uncertainty = float(pt.get("uncertainty", 0.25))
+    # Vectorize point extraction and grid mapping
+    df = pd.DataFrame([{
+        "x": float(pt["x"]), "y": float(pt["y"]), "z": float(pt["z"]),
+        "sem_prob": float(pt.get("sem_prob", 0.7)),
+        "uncertainty": float(pt.get("uncertainty", 0.25)),
+        "src_count": len(pt.get("sources") or [])
+    } for pt in points])
 
-        ix = int(np.floor(x / res)) - ix_min
-        iy = int(np.floor(y / res)) - iy_min
-        if ix < 0 or iy < 0 or ix >= width or iy >= height:
-            continue
+    df["weight"] = np.clip(1.0 / np.maximum(df["uncertainty"], 1e-3), 0.5, 10.0)
+    df["ix"] = (np.floor(df["x"] / res) - ix_min).astype(int)
+    df["iy"] = (np.floor(df["y"] / res) - iy_min).astype(int)
 
-        key = (iy, ix)
-        height_lists[key].append(z)
-        weight_lists[key].append(_weight_from_uncertainty(uncertainty))
-        sem_lists[key].append(sem_prob)
-        src_counts[key].append(len(sources))
+    mask = (df["ix"] >= 0) & (df["iy"] >= 0) & (df["ix"] < width) & (df["iy"] < height)
+    df = df[mask]
 
     dtm = np.full((height, width), np.nan, dtype=np.float32)
     confidence = np.zeros((height, width), dtype=np.float32)
 
-    for (iy, ix), heights in height_lists.items():
-        arr = np.asarray(heights, dtype=np.float32)
-        if arr.size == 0:
-            continue
-
-        weights = np.asarray(weight_lists[(iy, ix)], dtype=np.float32)
-        sems = np.asarray(sem_lists[(iy, ix)], dtype=np.float32)
-        srcs = np.asarray(src_counts[(iy, ix)], dtype=np.float32)
-
-        dtm[iy, ix] = float(np.percentile(arr, constants.LOWER_ENVELOPE_Q * 100.0))
-
-        avg_sem = float(np.clip(np.average(sems, weights=weights), 0.0, 1.0))
-        avg_weight = float(np.mean(weights))
-        sample_count = arr.size
-        avg_sources = float(np.mean(srcs))
-
-        conf = (
-            0.35
-            + 0.35 * min(sample_count / 4.0, 1.0)
-            + 0.20 * min(avg_weight / 4.0, 1.0)
-            + 0.10 * min(avg_sources / 3.0, 1.0)
+    if not df.empty:
+        grouped = df.groupby(["iy", "ix"])
+        
+        # DTM: lower envelope quantile of heights
+        z_q = grouped["z"].quantile(constants.LOWER_ENVELOPE_Q)
+        
+        # Confidence components
+        counts = grouped.size()
+        avg_weights = grouped["weight"].mean()
+        avg_srcs = grouped["src_count"].mean()
+        
+        # Weighted average of semantics
+        wt_sem = (df["weight"] * df["sem_prob"]).groupby([df["iy"], df["ix"]]).sum()
+        wt_sum = grouped["weight"].sum()
+        avg_sems = (wt_sem / wt_sum).clip(0.0, 1.0)
+        
+        conf_term = (
+            0.35 
+            + 0.35 * np.minimum(counts / 4.0, 1.0)
+            + 0.20 * np.minimum(avg_weights / 4.0, 1.0)
+            + 0.10 * np.minimum(avg_srcs / 3.0, 1.0)
         )
-        conf *= 0.6 + 0.4 * avg_sem
-        confidence[iy, ix] = float(np.clip(conf, 0.0, 1.0))
+        conf = (conf_term * (0.6 + 0.4 * avg_sems)).clip(0.0, 1.0)
+        
+        iys = z_q.index.get_level_values("iy").values
+        ixs = z_q.index.get_level_values("ix").values
+        
+        dtm[iys, ixs] = z_q.values.astype(np.float32)
+        confidence[iys, ixs] = conf.values.astype(np.float32)
 
     if return_grid:
         return dtm.astype(np.float32), confidence.astype(np.float32), grid

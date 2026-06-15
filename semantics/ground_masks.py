@@ -17,6 +17,13 @@ try:  # Optional model-backed segmentation.
 except Exception:  # pragma: no cover - handled at runtime
     torch = None
 
+try:
+    from ..gpu import detect_device, get_optimal_dtype, configure_torch_defaults
+except Exception:  # pragma: no cover
+    detect_device = None  # type: ignore[assignment]
+    get_optimal_dtype = None  # type: ignore[assignment]
+    configure_torch_defaults = None  # type: ignore[assignment]
+
 log = logging.getLogger(__name__)
 
 DEFAULT_GROUND_MASK_MODEL_ID = "nvidia/segformer-b0-finetuned-cityscapes-512-1024"
@@ -181,9 +188,18 @@ class _TorchMasker:
         if torch is None:
             raise RuntimeError("PyTorch is not available for ground mask model inference")
         self.loader = ImageryLoader(imagery_root)
-        self.device = torch.device(os.getenv("GROUND_MASK_DEVICE", "cpu"))
+        device_str = os.getenv("GROUND_MASK_DEVICE")
+        if not device_str and detect_device is not None:
+            device_str = detect_device()
+        elif not device_str:
+            device_str = "cpu"
+        self.device = torch.device(device_str)
+        self.dtype = get_optimal_dtype(device_str) if get_optimal_dtype else torch.float32
         self.model = torch.jit.load(str(path), map_location=self.device)
         self.model.eval()
+        if self.dtype == torch.float16 and self.device.type == "cuda":
+            self.model = self.model.half()
+            log.info("TorchScript ground mask model: FP16 inference on %s", self.device)
         self.path = path
 
     def predict(self, frame: FrameMeta) -> Optional[np.ndarray]:
@@ -191,12 +207,12 @@ class _TorchMasker:
         if image is None:
             return None
         tensor = torch.from_numpy(image.astype(np.float32) / 255.0)
-        tensor = tensor.permute(2, 0, 1).unsqueeze(0).to(self.device)
+        tensor = tensor.permute(2, 0, 1).unsqueeze(0).to(device=self.device, dtype=self.dtype)
         with torch.inference_mode():
             output = self.model(tensor)
         if isinstance(output, (list, tuple)):
             output = output[0]
-        arr = output.squeeze().detach().cpu().numpy().astype(np.float32, copy=False)
+        arr = output.squeeze().detach().float().cpu().numpy().astype(np.float32, copy=False)
         if arr.ndim != 2:
             arr = arr.reshape(arr.shape[-2], arr.shape[-1])
         if float(np.nanmin(arr)) < 0.0 or float(np.nanmax(arr)) > 1.0:
@@ -225,7 +241,13 @@ class _TransformersSegFormerMasker:
         self.model_id = model_id
         self.revision = os.getenv("GROUND_MASK_MODEL_REVISION")
         self.cache_dir = os.getenv("DTM_MODEL_CACHE_DIR", "models/huggingface")
-        self.device = torch.device(os.getenv("GROUND_MASK_DEVICE", "cpu"))
+        device_str = os.getenv("GROUND_MASK_DEVICE")
+        if not device_str and detect_device is not None:
+            device_str = detect_device()
+        elif not device_str:
+            device_str = "cpu"
+        self.device = torch.device(device_str)
+        self.dtype = get_optimal_dtype(device_str) if get_optimal_dtype else torch.float32
         local_only = os.getenv("DTM_MODELS_LOCAL_ONLY", "1").lower() not in {"0", "false", "no"}
         self.processor = AutoImageProcessor.from_pretrained(
             model_id,
@@ -238,8 +260,15 @@ class _TransformersSegFormerMasker:
             revision=self.revision,
             cache_dir=self.cache_dir,
             local_files_only=local_only,
+            torch_dtype=self.dtype,
         ).to(self.device)
         self.model.eval()
+        if self.dtype == torch.float16 and self.device.type == "cuda":
+            log.info("SegFormer ground mask model: FP16 inference on %s", self.device)
+
+        # Apply global torch perf defaults
+        if configure_torch_defaults is not None:
+            configure_torch_defaults()
 
         raw_labels = os.getenv("GROUND_MASK_LABELS")
         wanted = tuple(
@@ -269,7 +298,7 @@ class _TransformersSegFormerMasker:
 
         pil_image = Image.fromarray(image)
         inputs = self.processor(images=pil_image, return_tensors="pt")
-        inputs = {key: value.to(self.device) for key, value in inputs.items()}
+        inputs = {key: value.to(device=self.device, dtype=self.dtype if value.is_floating_point() else value.dtype) for key, value in inputs.items()}
         with torch.inference_mode():
             logits = self.model(**inputs).logits
             probs = torch.softmax(logits, dim=1)[:, self.ground_ids, :, :].sum(dim=1)
@@ -279,7 +308,7 @@ class _TransformersSegFormerMasker:
                 mode="bilinear",
                 align_corners=False,
             ).squeeze(0).squeeze(0)
-        arr = probs.detach().cpu().numpy().astype(np.float32, copy=False)
+        arr = probs.detach().float().cpu().numpy().astype(np.float32, copy=False)
         return np.clip(arr, 0.0, 1.0)
 
     def provenance(self) -> dict[str, str | None]:

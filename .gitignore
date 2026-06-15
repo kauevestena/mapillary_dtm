@@ -199,3 +199,6 @@ __pycache__/
 
 # IDE
 .vscode/
+imagery_cache
+out_eval
+out_eval_prod

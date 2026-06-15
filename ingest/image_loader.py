@@ -68,9 +68,7 @@ class ImageryLoader:
         return None
 
     def _sequence_dir(self, seq_id: str) -> Path:
-        if self.base is not None:
-            return Path(self.base) / str(seq_id)
-        return cache_utils.sequence_imagery_dir(seq_id)
+        return cache_utils.sequence_imagery_dir(seq_id, base=self.base)
 
     def _candidate_paths(self, directory: Path, image_id: str) -> Iterable[Path]:
         res = self.resolution

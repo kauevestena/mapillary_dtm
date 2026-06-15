@@ -412,7 +412,8 @@ def run_pipeline(
         imagery_cache_stats = cache_sequence_imagery(
             seqs,
             client=map_client,
-            max_per_sequence=imagery_per_sequence,
+            cache_dir=imagery_root_path,
+            max_per_sequence=imagery_per_sequence if imagery_per_sequence > 0 else None,
         )
         if imagery_cache_stats:
             log.info(
@@ -1390,11 +1391,10 @@ def _hf_model_cached(model_id: str | None) -> bool:
 
 
 def _frame_image_path(frame: FrameMeta, imagery_root: Path) -> Path | None:
-    candidates = []
-    for suffix in (".jpg", ".jpeg", ".png"):
-        candidates.append(imagery_root / frame.seq_id / f"{frame.image_id}{suffix}")
-        candidates.append(imagery_root / f"{frame.image_id}{suffix}")
-    for path in candidates:
+    from ..ingest.image_loader import ImageryLoader
+    loader = ImageryLoader(imagery_root)
+    seq_dir = loader._sequence_dir(frame.seq_id)
+    for path in loader._candidate_paths(seq_dir, frame.image_id):
         if path.exists():
             return path
     return None

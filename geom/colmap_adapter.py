@@ -557,19 +557,12 @@ def _iter_data_lines(path: Path, *, keep_blank: bool = False):
 
 
 def _find_cached_image(frame: FrameMeta, imagery_root: Optional[Path | str]) -> Optional[Path]:
-    roots: list[Path] = []
-    if imagery_root is not None:
-        roots.append(Path(imagery_root))
-    roots.append(Path(constants.MAPILLARY_CACHE_ROOT) / "imagery")
-    stems = [f"{frame.image_id}_{constants.MAPILLARY_DEFAULT_IMAGE_RES}", frame.image_id]
-    suffixes = [".jpg", ".jpeg", ".png", ".bmp"]
-    for root in roots:
-        seq_dir = root / str(frame.seq_id)
-        for stem in stems:
-            for suffix in suffixes:
-                candidate = seq_dir / f"{stem}{suffix}"
-                if candidate.exists():
-                    return candidate
+    from ..ingest.image_loader import ImageryLoader
+    loader = ImageryLoader(imagery_root)
+    seq_dir = loader._sequence_dir(frame.seq_id)
+    for path in loader._candidate_paths(seq_dir, frame.image_id):
+        if path.exists():
+            return path
     return None
 
 

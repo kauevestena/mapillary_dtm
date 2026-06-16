@@ -105,13 +105,18 @@ class OpenSfMRunner:
                 continue
             dataset_dir = self._prepare_dataset(seq_id, frames, imagery_root=imagery_root, force=force)
             reconstruction_path: Path | None = None
+            seq_result: Dict[str, ReconstructionResult] = {}
             if not force:
                 try:
                     reconstruction_path = self._find_reconstruction(dataset_dir)
                     log.info("Reusing existing OpenSfM reconstruction at %s", reconstruction_path)
-                except OpenSfMUnavailable:
+                    seq_result = self._load_fixture(reconstruction_path, {seq_id: frames})
+                except Exception:
                     reconstruction_path = None
-            if reconstruction_path is None:
+                    seq_result = {}
+            if reconstruction_path is None or seq_id not in seq_result:
+                if reconstruction_path is not None:
+                    log.info("Cached OpenSfM reconstruction for %s is invalid or empty; re-running.", seq_id)
                 try:
                     self._run_workflow(dataset_dir, frames, timeout=timeout)
                 except subprocess.CalledProcessError as exc:
@@ -120,7 +125,7 @@ class OpenSfMRunner:
                     raise OpenSfMUnavailable(f"OpenSfM timed out for {seq_id}: {exc}") from exc
 
                 reconstruction_path = self._find_reconstruction(dataset_dir)
-            seq_result = self._load_fixture(reconstruction_path, {seq_id: frames})
+                seq_result = self._load_fixture(reconstruction_path, {seq_id: frames})
             for result in seq_result.values():
                 result.metadata["source_type"] = "real"
                 result.metadata["workspace"] = str(dataset_dir)

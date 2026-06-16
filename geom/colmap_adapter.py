@@ -149,16 +149,41 @@ class COLMAPRunner:
         sparse_dir = workspace / "sparse" / "0"
         model_exists = sparse_dir.exists() and any(sparse_dir.glob("*.txt"))
 
+        results = {}
         if model_exists and not force:
             log.info("Reusing existing COLMAP sparse model at %s", sparse_dir)
-        else:
-            self._run_binary_pipeline(workspace, sequences, imagery_root=imagery_root, progress=progress)
+            txt_dir = workspace / "sparse_txt" / "0"
+            if not any(sparse_dir.glob("*.txt")):
+                try:
+                    self._convert_model_to_text(sparse_dir, txt_dir)
+                    sparse_dir = txt_dir
+                except Exception:
+                    pass
+            try:
+                results = self._load_fixture(sparse_dir, sequences)
+            except Exception:
+                results = {}
 
-        txt_dir = workspace / "sparse_txt" / "0"
-        if not any(sparse_dir.glob("*.txt")):
-            self._convert_model_to_text(sparse_dir, txt_dir)
-            sparse_dir = txt_dir
-        results = self._load_fixture(sparse_dir, sequences)
+        if not results:
+            if model_exists and not force:
+                log.info("Existing COLMAP sparse model is invalid or empty for current frames; re-running reconstruction.")
+                database = workspace / "database.db"
+                if database.exists():
+                    database.unlink()
+                images_dir = workspace / "images"
+                if images_dir.exists():
+                    shutil.rmtree(images_dir)
+                if sparse_dir.parent.exists():
+                    shutil.rmtree(sparse_dir.parent)
+                images_dir.mkdir(parents=True, exist_ok=True)
+                sparse_dir.parent.mkdir(parents=True, exist_ok=True)
+            self._run_binary_pipeline(workspace, sequences, imagery_root=imagery_root, progress=progress)
+            txt_dir = workspace / "sparse_txt" / "0"
+            if not any(sparse_dir.glob("*.txt")):
+                self._convert_model_to_text(sparse_dir, txt_dir)
+                sparse_dir = txt_dir
+            results = self._load_fixture(sparse_dir, sequences)
+
         for result in results.values():
             result.metadata["source_type"] = "real"
             result.metadata["workspace"] = str(workspace)
@@ -195,7 +220,31 @@ class COLMAPRunner:
         sparse_root = workspace / "sparse"
         sparse_root.mkdir(parents=True, exist_ok=True)
         timeout = int(os.getenv("COLMAP_TIMEOUT_SEC", "7200"))
-        use_gpu = "1" if self.config.use_gpu else "0"
+
+        # Detect COLMAP version to adapt option names
+        is_v4 = self._detect_version().startswith("4.")
+
+        # Determine GPU usage capability
+        actual_use_gpu = self.config.use_gpu
+        if actual_use_gpu and self._using_docker() and not self._is_docker_gpu_available():
+            log.warning("GPU requested for COLMAP, but Docker container cannot access GPU (likely CUDA/driver mismatch). Falling back to CPU.")
+            actual_use_gpu = False
+
+        use_gpu_val = "1" if actual_use_gpu else "0"
+
+        extractor_use_gpu_flag = "--FeatureExtraction.use_gpu" if is_v4 else "--SiftExtraction.use_gpu"
+        extractor_threads_flag = "--FeatureExtraction.num_threads" if is_v4 else "--SiftExtraction.num_threads"
+        matcher_use_gpu_flag = "--FeatureMatching.use_gpu" if is_v4 else "--SiftMatching.use_gpu"
+
+        # Determine matcher command based on config
+        matcher_type = self.config.matcher
+        if matcher_type not in {"exhaustive", "sequential", "vocabtree"}:
+            matcher_type = "sequential"
+        if matcher_type == "vocabtree":
+            log.warning("vocabtree matcher requested but not fully configured, falling back to sequential")
+            matcher_type = "sequential"
+        matcher_cmd = f"{matcher_type}_matcher"
+
         commands = [
             [
                 "feature_extractor",
@@ -205,17 +254,17 @@ class COLMAPRunner:
                 str(images_dir),
                 "--ImageReader.single_camera",
                 "0",
-                "--SiftExtraction.use_gpu",
-                use_gpu,
-                "--SiftExtraction.num_threads",
+                extractor_use_gpu_flag,
+                use_gpu_val,
+                extractor_threads_flag,
                 str(self.config.threads),
             ],
             [
-                "sequential_matcher",
+                matcher_cmd,
                 "--database_path",
                 str(database),
-                "--SiftMatching.use_gpu",
-                use_gpu,
+                matcher_use_gpu_flag,
+                use_gpu_val,
             ],
             [
                 "mapper",
@@ -230,13 +279,15 @@ class COLMAPRunner:
             ],
         ]
         # GPU-specific enhancements: more features + explicit GPU index
-        if self.config.use_gpu:
+        if actual_use_gpu:
+            extractor_gpu_idx_flag = "--FeatureExtraction.gpu_index" if is_v4 else "--SiftExtraction.gpu_index"
+            matcher_gpu_idx_flag = "--FeatureMatching.gpu_index" if is_v4 else "--SiftMatching.gpu_index"
             commands[0].extend([
                 "--SiftExtraction.max_num_features", "8192",
-                "--SiftExtraction.gpu_index", self.config.gpu_index,
+                extractor_gpu_idx_flag, self.config.gpu_index,
             ])
             commands[1].extend([
-                "--SiftMatching.gpu_index", self.config.gpu_index,
+                matcher_gpu_idx_flag, self.config.gpu_index,
             ])
         for command in commands:
             try:
@@ -257,11 +308,12 @@ class COLMAPRunner:
         images_dir.mkdir(parents=True, exist_ok=True)
         staged = 0
         for frames in _progress_iter(sequences.values(), "COLMAP stage images", progress):
-            for frame in frames:
+            sorted_frames = sorted(frames, key=lambda f: f.captured_at_ms)
+            for frame in sorted_frames:
                 src = _find_cached_image(frame, imagery_root)
                 if src is None:
                     continue
-                dest = images_dir / f"{frame.image_id}{src.suffix.lower()}"
+                dest = images_dir / f"{staged:06d}_{frame.image_id}{src.suffix.lower()}"
                 if not dest.exists():
                     if self._using_docker():
                         shutil.copy2(src, dest)
@@ -320,23 +372,95 @@ class COLMAPRunner:
         except Exception:
             return False
 
+    def _detect_version(self) -> str:
+        if self._using_docker():
+            image = os.getenv("COLMAP_DOCKER_IMAGE")
+            if not image:
+                return "3.0"
+            command = [
+                "docker",
+                "run",
+                "--rm",
+                image,
+                "colmap",
+            ]
+        else:
+            command = [self.colmap_cmd]
+        try:
+            res = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=10,
+            )
+            for line in res.stdout.splitlines():
+                if "COLMAP " in line:
+                    parts = line.split("COLMAP ")
+                    if len(parts) > 1:
+                        version_str = parts[1].split()[0]
+                        return version_str
+        except Exception as e:
+            log.warning("Failed to detect COLMAP version: %s", e)
+        return "3.0"
+
+    def _is_docker_gpu_available(self) -> bool:
+        if not self._using_docker():
+            return False
+        image = os.getenv("COLMAP_DOCKER_IMAGE")
+        if not image:
+            return False
+        try:
+            res = subprocess.run(
+                ["docker", "run", "--gpus", "all", "--rm", image, "colmap", "help"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=15,
+            )
+            if res.returncode == 0:
+                return True
+            log.debug("Docker GPU check failed with exit code %d: %s", res.returncode, res.stderr)
+            return False
+        except Exception as e:
+            log.debug("Docker GPU check raised exception: %s", e)
+            return False
+
     def _run_colmap(self, args: list[str], *, workspace: Path, timeout: int) -> None:
         if self._using_docker():
             image = os.getenv("COLMAP_DOCKER_IMAGE")
             if not image:
                 raise COLMAPUnavailable("COLMAP_DOCKER_IMAGE is not set")
-            command = [
-                "docker",
-                "run",
-                "--rm",
+            
+            # Use --gpus all if GPU is requested and available
+            use_gpu_docker = self.config.use_gpu and self._is_docker_gpu_available()
+            command = ["docker", "run", "--rm"]
+            if use_gpu_docker:
+                command.extend(["--gpus", "all"])
+            command.extend([
+                "--user",
+                f"{os.getuid()}:{os.getgid()}",
+                "-e",
+                "HOME=/tmp",
                 "-v",
                 f"{workspace}:{workspace}",
+            ])
+            # If `--image_path` is passed, mount it if it is outside of the workspace directory
+            if "--image_path" in args:
+                try:
+                    idx = args.index("--image_path")
+                    img_path = Path(args[idx + 1]).resolve()
+                    if not img_path.is_relative_to(workspace.resolve()):
+                        command.extend(["-v", f"{img_path}:{img_path}"])
+                except Exception as e:
+                    log.warning("Could not add mount for external image path: %s", e)
+            command.extend([
                 "-w",
                 str(workspace),
                 image,
                 "colmap",
                 *args,
-            ]
+            ])
         else:
             command = [self.colmap_cmd, *args]
         log_path = workspace / "colmap_commands.log"
@@ -580,7 +704,13 @@ def _resolve_frame(frames: Dict[str, FrameMeta], image_name: str) -> Optional[Fr
     if image_name in frames:
         return frames[image_name]
     stem = Path(image_name).stem
-    return frames.get(stem)
+    if stem in frames:
+        return frames[stem]
+    if "_" in stem:
+        parts = stem.split("_", 1)
+        if len(parts) > 1 and parts[1] in frames:
+            return frames[parts[1]]
+    return None
 
 
 def _merge_camera_params(

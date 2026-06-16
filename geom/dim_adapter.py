@@ -60,92 +60,118 @@ class DIMRunner:
                 
             seq_workspace = self.workspace_root / seq_id
             seq_workspace.mkdir(parents=True, exist_ok=True)
-            images_dir = seq_workspace / "images"
+            
+            # Move images_dir outside of seq_workspace so DIM config init doesn't delete it
+            images_dir = self.workspace_root / f"{seq_id}_images"
+            if images_dir.exists():
+                shutil.rmtree(images_dir)
             images_dir.mkdir(parents=True, exist_ok=True)
             
-            # 1. Stage images
-            staged = 0
-            for frame in frames_list:
-                src = _find_cached_image(frame, imagery_root)
-                if src:
-                    dest = images_dir / f"{frame.image_id}{src.suffix.lower()}"
-                    if not dest.exists():
-                        shutil.copy2(src, dest)
-                    staged += 1
-                    
-            if staged < 2:
-                log.warning("DIM: Not enough images staged for seq %s", seq_id)
-                continue
+            try:
+                # 1. Stage images
+                staged = 0
+                sorted_frames = sorted(frames_list, key=lambda f: f.captured_at_ms)
+                for frame in sorted_frames:
+                    src = _find_cached_image(frame, imagery_root)
+                    if src:
+                        dest = images_dir / f"{staged:06d}_{frame.image_id}{src.suffix.lower()}"
+                        if not dest.exists():
+                            shutil.copy2(src, dest)
+                        staged += 1
+                        
+                if staged < 2:
+                    log.warning("DIM: Not enough images staged for seq %s", seq_id)
+                    continue
 
-            # 2. Run DIM extraction and matching
-            db_path = seq_workspace / "database.db"
-            if db_path.exists():
-                db_path.unlink()
-                
-            try:
-                # DIM config and invocation
-                from deep_image_matching.pipeline import ImageMatchingPipeline
-                from deep_image_matching.config import get_config
-                
-                # Setup DIM config
-                dim_cfg = get_config(
-                    {
-                        "extractor": {"name": self.extractor},
-                        "matcher": {"name": self.matcher},
-                        "general": {
-                            "quality": constants.DIM_QUALITY,
-                            "tile_size": constants.DIM_TILE_SIZE,
-                            "tile_overlap": 0,
-                            "force_mid_resolution": False,
-                            "geom_verification": "pydegensac",
-                            "output_dir": str(seq_workspace),
-                        }
+                # 2. Run DIM extraction and matching
+                db_path = seq_workspace / "database.db"
+                if db_path.exists():
+                    db_path.unlink()
+                    
+                try:
+                    import deep_image_matching as dim
+                    
+                    if self.extractor == "no_extractor" or self.extractor is None or self.matcher in ["loftr", "se2loftr", "roma", "srif"]:
+                        pipeline_name = self.matcher
+                    else:
+                        pipeline_name = f"{self.extractor}+{self.matcher}"
+                    
+                    # If we have less than 3 staged images, sequential matching strategy fails validation.
+                    # Fallback to bruteforce/exhaustive matching in that case.
+                    strategy = "sequential" if staged >= 3 else "bruteforce"
+                    overlap = min(10, staged - 2) if (staged > 2 and strategy == "sequential") else 0
+                    
+                    args = {
+                        "images": images_dir,
+                        "outs": seq_workspace,
+                        "pipeline": pipeline_name,
+                        "strategy": strategy,
+                        "overlap": overlap,
+                        "quality": constants.DIM_QUALITY or "high",
+                        "tiling": "none",
+                        "force": True,
                     }
-                )
+                    
+                    # Setup DIM config
+                    dim_cfg = dim.Config(args)
+                    
+                    # Initialize ImageMatcher class
+                    matcher = dim.ImageMatcher(dim_cfg)
+                    
+                    # Run image matching and export to COLMAP format
+                    feature_path, match_path = matcher.run()
+                    
+                    dim.io.export_to_colmap(
+                        img_dir=images_dir,
+                        feature_path=feature_path,
+                        match_path=match_path,
+                        database_path=str(db_path),
+                        camera_config_path=dim_cfg.general["camera_options"],
+                    )
+                    
+                except Exception as e:
+                    log.error("DIM feature matching failed for seq %s: %s", seq_id, e)
+                    continue
                 
-                pipeline = ImageMatchingPipeline(
-                    imgs_dir=images_dir,
-                    output_dir=seq_workspace,
-                    config=dim_cfg,
-                )
-                pipeline.run()
-                
-                # DIM creates database.db in the output_dir
-                
-            except Exception as e:
-                log.error("DIM feature matching failed for seq %s: %s", seq_id, e)
-                continue
-                
-            # 3. Run COLMAP mapper on the DIM database
-            colmap_runner = COLMAPRunner(workspace_root=seq_workspace)
-            try:
-                # We skip extraction/matching and just run mapper
-                sparse_root = seq_workspace / "sparse"
-                sparse_root.mkdir(parents=True, exist_ok=True)
-                
-                colmap_runner._run_colmap(
-                    [
-                        "mapper",
-                        "--database_path", str(db_path),
-                        "--image_path", str(images_dir),
-                        "--output_path", str(sparse_root),
-                        "--Mapper.num_threads", str(constants.COLMAP_DEFAULT_THREADS),
-                    ],
-                    workspace=seq_workspace,
-                    timeout=7200,
-                )
-                
-                # 4. Convert and load result
-                txt_dir = seq_workspace / "sparse_txt" / "0"
-                model_dir = sparse_root / "0"
-                if model_dir.exists():
-                    colmap_runner._convert_model_to_text(model_dir, txt_dir)
-                    seq_results = colmap_runner._load_fixture(txt_dir, {seq_id: frames_list})
-                    if seq_id in seq_results:
-                        res = seq_results[seq_id]
-                        res.source = "dim"
-                        results[seq_id] = res
-            except Exception as e:
-                log.error("COLMAP mapping failed after DIM for seq %s: %s", seq_id, e)
+                # 3. Run COLMAP mapper on the DIM database
+                colmap_runner = COLMAPRunner(workspace_root=seq_workspace)
+                try:
+                    # We skip extraction/matching and just run mapper
+                    sparse_root = seq_workspace / "sparse"
+                    if sparse_root.exists():
+                        shutil.rmtree(sparse_root)
+                    sparse_root.mkdir(parents=True, exist_ok=True)
+                    
+                    sparse_txt = seq_workspace / "sparse_txt"
+                    if sparse_txt.exists():
+                        shutil.rmtree(sparse_txt)
+                    
+                    colmap_runner._run_colmap(
+                        [
+                            "mapper",
+                            "--database_path", str(db_path),
+                            "--image_path", str(images_dir),
+                            "--output_path", str(sparse_root),
+                            "--Mapper.num_threads", str(constants.COLMAP_DEFAULT_THREADS),
+                        ],
+                        workspace=seq_workspace,
+                        timeout=7200,
+                    )
+                    
+                    # 4. Convert and load result
+                    txt_dir = seq_workspace / "sparse_txt" / "0"
+                    model_dir = sparse_root / "0"
+                    if model_dir.exists():
+                        colmap_runner._convert_model_to_text(model_dir, txt_dir)
+                        seq_results = colmap_runner._load_fixture(txt_dir, {seq_id: frames_list})
+                        if seq_id in seq_results:
+                            res = seq_results[seq_id]
+                            res.source = "dim"
+                            results[seq_id] = res
+                except Exception as e:
+                    log.error("COLMAP mapping failed after DIM for seq %s: %s", seq_id, e)
+            finally:
+                if images_dir.exists():
+                    shutil.rmtree(images_dir)
                 
         return results

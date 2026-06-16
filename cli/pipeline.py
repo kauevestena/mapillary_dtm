@@ -469,25 +469,44 @@ def run_pipeline(
     )
     timings["opensfm_s"] = time.perf_counter() - t0
     t0 = time.perf_counter()
-    reconB = _run_stage(
-        run_state,
-        "colmap",
-        lambda: run_colmap(
-            seqs,
-            threads=colmap_threads,
-            use_gpu=colmap_use_gpu,
-            workspace_root=out_path / "cache" / "colmap",
-            imagery_root=imagery_root_path,
-            allow_synthetic=allow_synthetic,
-            progress=progress_enabled,
-        ),
-        inputs={
-            "workspace_root": str(out_path / "cache" / "colmap"),
-            "threads": colmap_threads,
-            "use_gpu": colmap_use_gpu,
-        },
-        counts=lambda result: _reconstruction_counts(result),
-    )
+    if not legacy_vo and constants.DIM_ENABLED:
+        reconB = _run_stage(
+            run_state,
+            "colmap",
+            lambda: run_dim(
+                seqs,
+                imagery_root=imagery_root_path,
+                workspace_root=out_path / "cache" / "colmap",
+                progress=progress_enabled,
+            ),
+            inputs={
+                "workspace_root": str(out_path / "cache" / "colmap"),
+            },
+            counts=lambda result: _reconstruction_counts(result),
+        )
+        if not allow_synthetic and not reconB:
+            from ..geom.colmap_adapter import COLMAPUnavailable
+            raise COLMAPUnavailable("COLMAP synthetic fallback disabled and no real reconstruction was produced")
+    else:
+        reconB = _run_stage(
+            run_state,
+            "colmap",
+            lambda: run_colmap(
+                seqs,
+                threads=colmap_threads,
+                use_gpu=colmap_use_gpu,
+                workspace_root=out_path / "cache" / "colmap",
+                imagery_root=imagery_root_path,
+                allow_synthetic=allow_synthetic,
+                progress=progress_enabled,
+            ),
+            inputs={
+                "workspace_root": str(out_path / "cache" / "colmap"),
+                "threads": colmap_threads,
+                "use_gpu": colmap_use_gpu,
+            },
+            counts=lambda result: _reconstruction_counts(result),
+        )
     timings["colmap_s"] = time.perf_counter() - t0
     t0 = time.perf_counter()
     t0 = time.perf_counter()

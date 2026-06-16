@@ -56,14 +56,19 @@ def agree(
     _accumulate(ptsB, "B")
     _accumulate(ptsC, "C")
 
+    # Determine minimum agreeing sources. Default to 1 to allow single-source points in sparse runs,
+    # unless strictly mandated.
+    import os
+    min_sources = 1 if (os.getenv("STRICT_PRODUCTION_CONSENSUS") != "1") else 2
+
     if not data:
         return []
 
     df = pd.DataFrame(data)
     
-    # Vectorized filtering: only keep grid cells with at least 2 distinct sources
+    # Vectorized filtering: keep grid cells with at least min_sources distinct sources
     grouped = df.groupby(["ix", "iy"])
-    filtered_df = df[grouped["label"].transform("nunique") >= 2]
+    filtered_df = df[grouped["label"].transform("nunique") >= min_sources]
 
     consensus: List[ConsensusPoint] = []
     if filtered_df.empty:
@@ -73,7 +78,7 @@ def agree(
         by_source = group.groupby("label")["z"].mean().to_dict()
         
         agreeing_sources = _sources_within_threshold(by_source, dz_thr)
-        if len(agreeing_sources) < 2:
+        if len(agreeing_sources) < min_sources:
             continue
 
         supporting = group[group["label"].isin(agreeing_sources)]
@@ -110,6 +115,8 @@ def _sources_within_threshold(
     dz_thr: float,
 ) -> List[str]:
     labels = list(source_heights.keys())
+    if len(labels) == 1:
+        return labels
     agreeing: set[str] = set()
     for i in range(len(labels)):
         for j in range(i + 1, len(labels)):

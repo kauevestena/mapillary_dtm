@@ -82,3 +82,70 @@ def write_laz(out_dir: str, points: np.ndarray, attrs: Dict[str, np.ndarray] | N
                 continue
     las.write(path)
     return path
+
+
+def write_ply_from_geotiff(tiff_path: str, output_dir: str) -> str:
+    """
+    Convert a GeoTIFF DTM file to PLY point cloud format.
+    
+    Args:
+        tiff_path (str): Path to the input GeoTIFF file
+        output_dir (str): Directory where output files will be saved
+        
+    Returns:
+        str: Path to the created PLY file
+    """
+    import rasterio
+    from pathlib import Path
+    
+    # Read the GeoTIFF file
+    with rasterio.open(tiff_path) as src:
+        # Read the elevation data
+        dtm = src.read(1)
+        
+        # Get geospatial information
+        transform = src.transform
+        crs = src.crs
+        
+        # Get image dimensions
+        height, width = dtm.shape
+        
+        # Create output directory if it doesn't exist
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Convert to point cloud (PLY format)
+        xyz_points = []
+        
+        # Iterate through the grid and create 3D points
+        for y in range(height):
+            for x in range(width):
+                # Skip no-data values (typically -9999 or NaN)
+                if dtm[y, x] < -1000 or np.isnan(dtm[y, x]):
+                    continue
+                
+                # Convert pixel coordinates to geographic coordinates
+                # Using the affine transform to get world coordinates
+                lon, lat = transform * (x, y)
+                
+                # Create point (x, y, z) where z is the elevation
+                point = [lon, lat, dtm[y, x]]
+                xyz_points.append(point)
+        
+        # Write PLY file (ASCII format)
+        ply_path = Path(output_dir) / "dtm_0p5m_ellipsoid.ply"
+        
+        with open(ply_path, "w") as f:
+            # PLY header
+            f.write("ply\n")
+            f.write("format ascii 1.0\n")
+            f.write(f"element vertex {len(xyz_points)}\n")
+            f.write("property float x\n")
+            f.write("property float y\n")
+            f.write("property float z\n")
+            f.write("end_header\n")
+            
+            # Write points
+            for point in xyz_points:
+                f.write(f"{point[0]:.6f} {point[1]:.6f} {point[2]:.6f}\n")
+    
+    return str(ply_path)

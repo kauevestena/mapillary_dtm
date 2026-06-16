@@ -50,7 +50,7 @@ from ..ground.breakline_integration import (
 from ..ingest.sequence_filter import filter_car_sequences
 from ..ingest.sequence_scan import discover_sequences
 from ..ingest.imagery_cache import prefetch_imagery as cache_sequence_imagery
-from ..io.writers import write_geotiffs, write_laz
+from ..io.writers import write_geotiffs, write_laz, write_ply_from_geotiff
 from ..osm.osmnx_utils import corridor_from_osm_bbox
 from ..qa.qa_external import compare_to_geotiff
 from ..qa.qa_internal import slope_from_plane_fit, write_agreement_maps
@@ -756,6 +756,8 @@ def run_pipeline(
     geotiff_paths = write_geotiffs(
         out_dir, dtm_write, slope_write, conf_write, transform=transform, crs=raster_crs
     )
+    # Generate PLY file from the DTM geotiff
+    ply_path = write_ply_from_geotiff(geotiff_paths["dtm_0p5m_ellipsoid.tif"], out_dir)
     laz_points, laz_attrs = _points_and_attrs_from_consensus(consensus_all)
     laz_path = write_laz(out_dir, laz_points, attrs=laz_attrs)
 

@@ -34,6 +34,34 @@ class FrameMeta:
             "thumbnail_url": self.thumbnail_url,
         }
 
+    def to_geojson_feature(self) -> Dict[str, Any]:
+        """Return a GeoJSON Feature with a Point geometry at the GNSS camera position.
+
+        The ``geometry`` uses WGS84 (lon, lat) coordinates.  Ellipsoidal altitude
+        is included as the optional third coordinate when available.  All frame
+        attributes are placed in ``properties`` so the file can be opened directly
+        in GIS tools (QGIS, geojson.io, etc.).
+        """
+        coordinates: list = [float(self.lon), float(self.lat)]
+        if self.alt_ellip is not None:
+            coordinates.append(float(self.alt_ellip))
+        return {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": coordinates,
+            },
+            "properties": {
+                "image_id": self.image_id,
+                "seq_id": self.seq_id,
+                "captured_at_ms": int(self.captured_at_ms),
+                "camera_type": self.camera_type,
+                "cam_params": self.cam_params,
+                "quality_score": float(self.quality_score) if self.quality_score is not None else None,
+                "thumbnail_url": self.thumbnail_url,
+            },
+        }
+
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "FrameMeta":
         if data.get("image_id") is None or data.get("seq_id") is None:

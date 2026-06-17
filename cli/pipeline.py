@@ -51,6 +51,7 @@ from ..ingest.sequence_filter import filter_car_sequences
 from ..ingest.sequence_scan import discover_sequences
 from ..ingest.imagery_cache import prefetch_imagery as cache_sequence_imagery
 from ..io.writers import write_geotiffs, write_laz, write_ply_from_geotiff
+from ..io.geojson_writers import write_frames_geojson, write_all_camera_positions_geojson
 from ..osm.osmnx_utils import corridor_from_osm_bbox
 from ..qa.qa_external import compare_to_geotiff
 from ..qa.qa_internal import slope_from_plane_fit, write_agreement_maps
@@ -318,6 +319,40 @@ def run_pipeline(
         Stage names to invalidate, including downstream stages.
     progress : bool, optional
         Show tqdm progress bars. Defaults to interactive stderr only.
+
+    Output Layout
+    -------------
+    The output directory (``out_dir``) has the following structure after a
+    successful run::
+
+        out_dir/
+          manifest.json                  full run manifest (inputs, timings, outputs)
+          run_state.json                 per-stage status used for --resume
+          report.html                    QA summary report
+          dtm_0p5m_ellipsoid.tif         primary DTM raster (0.5 m, ellipsoidal heights)
+          slope_deg.tif                  slope raster (degrees)
+          confidence.tif                 confidence raster [0..1]
+          ground_points.laz              consensus ground points (LAS/LAZ point cloud)
+          dtm_0p5m_ellipsoid.ply         PLY mesh converted from the DTM raster
+          metadata/
+            frames.geojson               all ingested frames — GNSS camera position
+                                         (written after the ingestion stage)
+            camera_positions.geojson     SfM-refined camera positions in WGS84,
+                                         one feature per recovered pose, tagged with
+                                         source (opensfm / colmap / vo)
+                                         (written after the fusion/writers stage)
+          cache/
+            opensfm/                     OpenSfM workspace
+            colmap/                      COLMAP workspace
+            masks/                       ground segmentation masks (.npz per frame)
+            depth_mono/                  monocular depth maps (.npz per frame)
+          qa/
+            qa_summary.json              QA metrics summary
+            agreement_maps.npz           per-source DTM agreement maps
+
+    The ``manifest.json`` ``outputs`` key lists the absolute paths to every
+    generated file so downstream tools can locate them without hard-coding
+    directory assumptions.
     """
     if strict_production and allow_synthetic:
         raise ValueError("--allow-synthetic cannot be combined with strict production mode")
@@ -329,6 +364,8 @@ def run_pipeline(
     out_path = Path(out_dir)
     qa_dir = out_path / "qa"
     qa_dir.mkdir(parents=True, exist_ok=True)
+    metadata_dir = out_path / "metadata"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
     mask_cache_dir = out_path / "cache" / "masks"
     depth_cache_dir = out_path / "cache" / "depth_mono"
     progress_enabled = _progress_enabled(progress)
@@ -342,6 +379,10 @@ def run_pipeline(
     dataset_path = Path(dataset_dir) if dataset_dir else None
     bbox = _resolve_bbox(aoi_bbox, dataset_path)
     imagery_root_path = _resolve_imagery_root(dataset_path, imagery_root)
+
+    # Paths for GeoJSON metadata outputs
+    frames_geojson_path = metadata_dir / "frames.geojson"
+    camera_positions_geojson_path = metadata_dir / "camera_positions.geojson"
 
     map_client: MapillaryClient | None = None
     t0 = time.perf_counter()
@@ -365,7 +406,16 @@ def run_pipeline(
             "bbox": bbox,
         },
         counts=lambda loaded: _sequence_counts(loaded),
+        outputs=lambda loaded: {"frames_geojson": str(frames_geojson_path)},
     )
+    # Write frame metadata as GeoJSON immediately after ingestion so the GNSS
+    # camera positions are available for inspection before reconstruction runs.
+    try:
+        write_frames_geojson(seqs, frames_geojson_path)
+    except Exception as exc:
+        log.warning("Failed to write frames GeoJSON: %s", exc)
+        run_warnings.append(f"frames GeoJSON write failed: {exc}")
+
     input_fingerprint = _run_inputs_fingerprint(
         seqs,
         bbox=bbox,
@@ -772,12 +822,28 @@ def run_pipeline(
     source_dtms = _source_dtms_on_grid({"opensfm": ptsA, "colmap": ptsB, "vo": ptsC}, grid)
     agreement_results = write_agreement_maps(agreement_path, dtm_s, source_dtms)
     agreement_summary = _summarize_agreement(agreement_results)
+
+    # Write SfM-refined camera positions from all three sources combined so the
+    # user can overlay GNSS (frames.geojson) vs. SfM positions (camera_positions.geojson)
+    # directly in a GIS tool without any further post-processing.
+    try:
+        write_all_camera_positions_geojson(
+            {"opensfm": reconA, "colmap": reconB, "vo": vo},
+            lon0, lat0, h0,
+            camera_positions_geojson_path,
+        )
+    except Exception as exc:
+        log.warning("Failed to write camera positions GeoJSON: %s", exc)
+        run_warnings.append(f"camera_positions GeoJSON write failed: {exc}")
+
     run_state.complete(
         "fusion_writers",
         outputs={
             "geotiffs": geotiff_paths,
             "laz": laz_path,
             "agreement_maps": str(agreement_path),
+            "frames_geojson": str(frames_geojson_path),
+            "camera_positions_geojson": str(camera_positions_geojson_path),
         },
         counts={
             "dtm_shape": list(dtm_s.shape),
@@ -865,6 +931,8 @@ def run_pipeline(
             "geotiffs": geotiff_paths,
             "laz": laz_path,
             "agreement_maps": str(agreement_path),
+            "frames_geojson": str(frames_geojson_path),
+            "camera_positions_geojson": str(camera_positions_geojson_path),
             "manifest": str(out_path / "manifest.json"),
             "qa_summary": str(qa_dir / "qa_summary.json"),
             "run_state": str(out_path / "run_state.json"),
@@ -900,6 +968,8 @@ def run_pipeline(
         "Confidence": geotiff_paths.get("confidence.tif", ""),
         "LAZ / NPZ": laz_path,
         "Agreement maps": str(agreement_path),
+        "Frame positions (GeoJSON)": str(frames_geojson_path),
+        "Camera positions (GeoJSON)": str(camera_positions_geojson_path),
         "Manifest": str(out_path / "manifest.json"),
         "QA summary": str(qa_dir / "qa_summary.json"),
     }

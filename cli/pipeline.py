@@ -57,7 +57,7 @@ from ..qa.qa_internal import slope_from_plane_fit, write_agreement_maps
 from ..qa.reports import write_html
 from ..semantics.curb_edge_lane import extract_curbs_and_lanes
 from ..semantics.ground_masks import prepare as prepare_masks
-from ..fusion.heightmap_fusion import GridSpec, fuse as fuse_heightmap
+from ..fusion.heightmap_fusion import GridSpec, fuse as fuse_heightmap, _grid_from_points
 from ..fusion.smoothing_regularization import edge_aware
 
 log = logging.getLogger(__name__)
@@ -744,7 +744,14 @@ def run_pipeline(
 
     t0 = time.perf_counter()
     run_state.start("fusion_writers")
-    dtm, conf, grid = fuse_heightmap(consensus_all, return_grid=True)
+    # Compute the grid from the consensus points *before* TIN augmentation so
+    # that TIN-extrapolated samples (which can extend far beyond actual data
+    # coverage) do not inflate the bounding box.  The same grid is reused for
+    # the fused DTM raster, the per-source agreement maps, and the geotiff
+    # transform, guaranteeing that generation and evaluation share identical
+    # cell boundaries.
+    consensus_grid = _grid_from_points(consensus)
+    dtm, conf, grid = fuse_heightmap(consensus_all, return_grid=True, grid=consensus_grid)
     dtm_s = edge_aware(dtm)
     slope_deg, aspect = slope_from_plane_fit(dtm_s)
 

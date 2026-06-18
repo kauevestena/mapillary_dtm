@@ -57,7 +57,7 @@ from ..qa.qa_external import compare_to_geotiff
 from ..qa.qa_internal import slope_from_plane_fit, write_agreement_maps
 from ..qa.reports import write_html
 from ..semantics.curb_edge_lane import extract_curbs_and_lanes
-from ..semantics.ground_masks import prepare as prepare_masks
+from ..semantics.ground_masks import prepare as prepare_masks, filter_sequences_by_mask
 from ..fusion.heightmap_fusion import GridSpec, fuse as fuse_heightmap, _grid_from_points
 from ..fusion.smoothing_regularization import edge_aware
 
@@ -490,6 +490,12 @@ def run_pipeline(
         counts=lambda result: _mask_cache_counts(seqs, mask_cache_dir, strict=not allow_synthetic),
     )
     timings["masks_s"] = time.perf_counter() - t0
+
+    filter_sequences_by_mask(seqs, mask_cache_dir)
+    if not seqs:
+        log.warning("All sequences dropped due to insufficient road masks. Stopping pipeline early.")
+        return json.loads((out_path / "manifest.json").read_text(encoding="utf8")) if (out_path / "manifest.json").exists() else {}
+
     t0 = time.perf_counter()
     curb_lines = _run_stage(
         run_state,

@@ -133,3 +133,6 @@ bbox = {
     "max_lon": -48.589890,
     "max_lat": -27.586780,
 }  # Florianópolis, SC, Brazil
+
+# Semantics
+MIN_ROAD_MASK_RATIO = 0.05

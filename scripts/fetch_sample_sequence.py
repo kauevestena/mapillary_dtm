@@ -1,49 +1,43 @@
 #!/usr/bin/env python3
 import sys
-import json
 import logging
+import json
+import shutil
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from dtm_from_mapillary.api.mapillary_client import MapillaryClient
+from dtm_from_mapillary.ingest.sequence_scan import discover_sequences, _write_cache
+from dtm_from_mapillary.ingest.imagery_cache import prefetch_imagery
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("fetch_sample")
 
 def main():
-    client = MapillaryClient()
+    token_file = ROOT / "mapillary_token"
+    token = token_file.read_text().strip() if token_file.exists() else None
+    client = MapillaryClient(token=token)
     bbox = [-48.596644, -27.591363, -48.589890, -27.586780]
     
-    log.info(f"Querying Mapillary API for images in bbox {bbox}...")
-    images = client.list_images_in_bbox(bbox, limit=1000)
+    log.info(f"Querying Mapillary API for sequences in bbox {bbox}...")
     
-    allowed = {"perspective", "fisheye", "spherical"}
-    valid = [i for i in images if i.get("camera_type") in allowed]
+    # Use pipeline function to discover sequences
+    # We disable cache writing temporarily to not pollute the QA folder with 100s of sequence metadata files
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        seqs = discover_sequences(bbox, client=client, cache_dir=td, use_cache=False)
     
-    from collections import defaultdict
-    seqs = defaultdict(list)
-    for i in valid:
-        seq = i.get("sequence")
-        seq_id = None
-        if isinstance(seq, dict):
-            seq_id = seq.get("id")
-        elif isinstance(seq, str):
-            seq_id = seq
-        else:
-            seq_id = i.get("sequence_id")
-            
-        if seq_id:
-            seqs[str(seq_id)].append(i)
-            
     target_seq = None
     target_images = []
     
-    for seq_id, imgs in seqs.items():
-        if len(imgs) >= 4:
-            imgs.sort(key=lambda x: x.get("captured_at", 0))
+    for seq_id, frames in seqs.items():
+        # filter for perspective cameras as done previously
+        allowed_frames = [f for f in frames if f.camera_type in {"perspective", "fisheye", "spherical"}]
+        if len(allowed_frames) >= 4:
             target_seq = seq_id
-            target_images = imgs[len(imgs)//2 : len(imgs)//2 + 4]
+            target_images = allowed_frames[len(allowed_frames)//2 : len(allowed_frames)//2 + 4]
             break
             
     if not target_seq:
@@ -52,37 +46,34 @@ def main():
         
     log.info(f"Selected sequence {target_seq} with {len(target_images)} images.")
     
-    img_ids = [i["id"] for i in target_images]
-    detailed = []
-    for iid in img_ids:
-        detailed.append(client.get_image_meta(iid, fields=["id", "sequence", "geometry", "captured_at", "camera_type", "camera_parameters", "quality_score", "thumb_1024_url"]))
-    
     out_dir = Path("qa/data/sample_dataset")
-    img_dir = out_dir / "imagery" / target_seq
-    img_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     
+    # We save exactly 4 frames into a single sequence mapping
+    target_mapping = {target_seq: target_images}
+    
+    # Use pipeline function to download imagery
+    log.info("Prefetching imagery using pipeline cache function...")
+    prefetch_imagery(target_mapping, client=client, cache_dir=out_dir, resolution=1024)
+    
+    # We maintain the legacy metadata.json format since it's an explicit QA fixture
     saved_meta = []
-    for d in detailed:
-        url = d.get("thumb_1024_url")
-        if not url:
-            log.warning(f"No 1024px thumb for {d['id']}, skipping")
-            continue
-            
-        dest = img_dir / f"{d['id']}_1024.jpg"
-        log.info(f"Downloading {dest} ...")
-        client.download_file(url, dest)
-        
+    for frame in target_images:
         saved_meta.append({
-            "image_id": d["id"],
-            "seq_id": target_seq,
-            "captured_at_ms": d["captured_at"],
-            "lon": d["geometry"]["coordinates"][0],
-            "lat": d["geometry"]["coordinates"][1],
-            "camera_type": d.get("camera_type", "perspective"),
-            "camera_parameters": d.get("camera_parameters", []),
-            "quality_score": d.get("quality_score", 0.5),
-            "thumbnail_url": url,
-            "local_path": str(dest)
+            "image_id": frame.image_id,
+            "seq_id": frame.seq_id,
+            "captured_at_ms": frame.captured_at_ms,
+            "lon": frame.lon,
+            "lat": frame.lat,
+            "camera_type": frame.camera_type,
+            "camera_parameters": [
+                frame.cam_params.get("focal", 0.0),
+                frame.cam_params.get("k1", 0.0),
+                frame.cam_params.get("k2", 0.0)
+            ],
+            "quality_score": frame.quality_score,
+            "thumbnail_url": frame.thumbnail_url,
+            "local_path": f"qa/data/sample_dataset/imagery/{target_seq}/{frame.image_id}_1024.jpg"
         })
         
     with open(out_dir / "metadata.json", "w") as f:

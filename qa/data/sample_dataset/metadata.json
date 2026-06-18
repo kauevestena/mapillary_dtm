@@ -1,68 +1,68 @@
 {
-  "qg5ljb4du8nz1k7saz6tao": [
+  "l27kwlcx3fjh7t6w9ccvic": [
     {
-      "image_id": "317245683168716",
-      "seq_id": "qg5ljb4du8nz1k7saz6tao",
-      "captured_at_ms": 1562353857681,
-      "lon": -48.593290179458,
-      "lat": -27.591342949813,
+      "image_id": "549798756007659",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347869643,
+      "lon": -48.594733009343,
+      "lat": -27.587359649588,
       "camera_type": "fisheye",
       "camera_parameters": [
-        0.46302865087538,
-        -0.052822590290885,
-        0.0052300044097879
+        0.0,
+        0.0,
+        0.0
       ],
-      "quality_score": 0.744,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An9_sXTNIthT_35e96_nTI6xgr_CreL4ShyLCjbDfj5S9QcuRRWaHfuZOCDcIrx5wvrKBGo02N3hlb9IdPYw4q2owuPk811fes3bklYeK1lS3HCGgynWJfZqPUlOUuZkMNu2s5_sNVtGHA52xFDnEUE?stp=s1024x576&edm=ALXxkZ8EAAAA&_nc_gid=r7BqaRae5Ftmx_26ADivSg&_nc_oc=Adp2RKInJinGuRecH2R1ZwiiuAyIUD4KIK1bw9SpF8eeGocwU3060EynAywcpvpsrTk&ccb=10-5&oh=00_Af-ASaAO0Sd3-E5rvg0cfw88sfbdVIYcSgza7HLxAy1p9A&oe=6A599F4C&_nc_sid=201bca",
-      "local_path": "qa/data/sample_dataset/imagery/qg5ljb4du8nz1k7saz6tao/317245683168716_1024.jpg"
+      "quality_score": 0.755,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An807lN4Tl5eTFOdVXxu8OXCVCk_ydB76EDx4te4UN_K7UpdnkCX7Xcc8kIuQXmRwmnBHEuRryneCYHvosae-w6H1jzzyioHIs6iCNv739NqJKyCv9tNo6O90X_gXibVa0f_Tnv2Xp-x3QMX3RZuVA?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdoY__liyuwQ8TXYWA6NRV6ZNcTcwshHlE29eWkD2uAdiHJY0UN5Z7XCYSrXxdv6nYw&ccb=10-5&oh=00_Af_itUiOBfIfazscQXAlIcsWnBcpkTt5pNCWHrcR6dra9Q&oe=6A5BA26E&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/549798756007659_1024.jpg"
     },
     {
-      "image_id": "269745421550614",
-      "seq_id": "qg5ljb4du8nz1k7saz6tao",
-      "captured_at_ms": 1562353857939,
-      "lon": -48.593250162218,
-      "lat": -27.591348586864,
+      "image_id": "177246630949005",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347869827,
+      "lon": -48.594713174206,
+      "lat": -27.587363311461,
       "camera_type": "fisheye",
       "camera_parameters": [
-        0.46302865087538,
-        -0.052822590290885,
-        0.0052300044097879
+        0.0,
+        0.0,
+        0.0
+      ],
+      "quality_score": 0.75,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An-uHRPh7ubP92M9c4qrQpnEsJBQzckD23Qf48sINVibmVrTPZ60zjrvE3279oar-EK6M9WuazZGhm-JnIjNirycXkges_xwDNoP3R4ntAkC-3P7iCbZREI6vYjtK-vYUGWDJtCHhvXG1iQOiK5YGg?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdoLmzVYxcXNXckEJVVVkwqfGQoYzIcvOysvxRwzOKoHh0xKWh8z3PYvnR41V-zBnaA&ccb=10-6&oh=00_Af8SulcvUq0wwhDlmbl04cXKT-NEcN3FUe7tgCxlvnAGtQ&oe=6A5B8FD0&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/177246630949005_1024.jpg"
+    },
+    {
+      "image_id": "170058561705143",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347870010,
+      "lon": -48.594693340517,
+      "lat": -27.587366979355,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "quality_score": 0.761,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An88FOnyWpZFkeWGMYMEP-Rh3OV1MTQSrnsRgvYnhiMLFwaapU0aidwnV-OHC-_H6XEQqEnkSdtEIq1IIkv7gNfGHZJ30PRgkNeORRuK7lBAF5AoTT2ET2s123kp082V8F_t-0PbUC68vQDgx4WaHg?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdqKIUAtb_5g4vUBGIuN-vXfPXMOneygUT69ZYRptTbcS9ctEdeu5uVW7-ZlVWH1G-w&ccb=10-5&oh=00_Af8pIt1kX_fguPY4O9TkeyQRep07vOBzbBqsAJFWeJbgTQ&oe=6A5BA2B3&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/170058561705143_1024.jpg"
+    },
+    {
+      "image_id": "530796564614344",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347870182,
+      "lon": -48.594673522337,
+      "lat": -27.587370713204,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.0,
+        0.0,
+        0.0
       ],
       "quality_score": 0.747,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An9YIuAWPShG-1vBFgzjfgtDw9UVlLfP7FPuo0L1GMzoQ8aiZhzmPODR8WB2U7sn2MXXmabQcGEPUGFv5bglVRlU9nVVBQJzD_y5PGWJHgnba6gWoflwLkg8epPtYKvhJ55asiSK2NiMOhp4a45q1g?stp=s1024x576&edm=ALXxkZ8EAAAA&_nc_gid=_A0C4jhPoD-g-Dl5p45mOw&_nc_oc=AdqU9ecSKYS6vLmI74nNCZjP15R0vGKnbdDT7QxNsWwpj7YtMLJOS5PF8adgIzSvcJ8&ccb=10-5&oh=00_Af92Es1W_GsRsadSjAfzMS0VbHnvPIPCbV3rT4tt84-X-g&oe=6A598F1C&_nc_sid=201bca",
-      "local_path": "qa/data/sample_dataset/imagery/qg5ljb4du8nz1k7saz6tao/269745421550614_1024.jpg"
-    },
-    {
-      "image_id": "161759252476678",
-      "seq_id": "qg5ljb4du8nz1k7saz6tao",
-      "captured_at_ms": 1562353858073,
-      "lon": -48.593230258035,
-      "lat": -27.5913519415,
-      "camera_type": "fisheye",
-      "camera_parameters": [
-        0.46302865087538,
-        -0.052822590290885,
-        0.0052300044097879
-      ],
-      "quality_score": 0.733,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An8iFWnxRNrcgDcC9DK9FCSRM4S3Mducu_l-0IC2b9rkGx3Vm_qEwXDGSUv_gL9cUox4H52XJcMGSIl_DW6lBLFoOGK-VDK3cPXPKA-SGY_CZsJRwHh-PIYbPxpsJyd78eo57436IdyxZbsntIBd8J8?stp=s1024x576&edm=ALXxkZ8EAAAA&_nc_gid=X6MudmKoZnwWEoyWn0By3w&_nc_oc=AdpZWYRAYCKWXAJTpxIJ9TCGcNeJit87DnQ_oXOwWxf_I2Xl5xcRgB3vvYJky1CHmc0&ccb=10-5&oh=00_Af_Ni6ecwh6XIM-XdqUs4mJDyC9ILiIV9NgjxNhAQwLFaQ&oe=6A598E40&_nc_sid=201bca",
-      "local_path": "qa/data/sample_dataset/imagery/qg5ljb4du8nz1k7saz6tao/161759252476678_1024.jpg"
-    },
-    {
-      "image_id": "316311096725950",
-      "seq_id": "qg5ljb4du8nz1k7saz6tao",
-      "captured_at_ms": 1562353858342,
-      "lon": -48.593190449668,
-      "lat": -27.591358650773,
-      "camera_type": "fisheye",
-      "camera_parameters": [
-        0.46302865087538,
-        -0.052822590290885,
-        0.0052300044097879
-      ],
-      "quality_score": 0.711,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An8OrdI6VPUxey4pnuhcGcK2uytdO4CJ6F53SjItpyQtflD6L_9pO_xdTiSRZG-1hPA07ghEkPchxEAW5gO1Q9J6GSxg9uaiUZm3OT7ZUDUAfvAJE-5Fl9up55zdSBiF4lo5_hEON_J1U-XENMgvNdA?stp=s1024x576&edm=ALXxkZ8EAAAA&_nc_gid=UirMeiMqskZU7DVGlckQ-g&_nc_oc=Adp8jXmfYwXReO-opUdCo4nXZi7APfXWKXb1EsFZ998S8LrR9lobgrYLQ_iRUHvZGKQ&ccb=10-5&oh=00_Af9tFp4GSA6vRwTXHZ5g4Cb1J7mStUaIizjRQtFJFAUFsQ&oe=6A598322&_nc_sid=201bca",
-      "local_path": "qa/data/sample_dataset/imagery/qg5ljb4du8nz1k7saz6tao/316311096725950_1024.jpg"
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An9EN0YnGqgiroWNO9ykfKrUoA2KTH17QCZJF0x43XeJ3jKX19jbNY-Hvl-8cvUfy0ponJMT-5RY5LiyhQfifhV6-xDLGyhK4jRJtD1gxDRvPrbK1Ed-oUKZBt-bS-OY--yMYcgm3WzI-i2YVaxkyg?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdqnL_TREt9nGg5GdhNqxMHhjIaBazUQ_XBmH1fmgZTRXOBn1ANcoVCf4phhTiKVUp4&ccb=10-5&oh=00_Af_40ZMauR0E1fJbK1HVrU1R-1rGm58s__dqozN_ymJAIA&oe=6A5BB346&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/530796564614344_1024.jpg"
     }
   ]
 }

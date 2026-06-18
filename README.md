@@ -134,14 +134,12 @@ dtm_from_mapillary/
    ```bash
    python -m dtm_from_mapillary.cli.pipeline run --aoi-bbox "-122.45,37.76,-122.41,37.79" --out-dir ./out
    ```
-   By default this is a strict production run: real backends must be available and synthetic/heuristic fallbacks are disabled. For a development smoke run against the local sample bundle:
+   By default this is a strict production run: real backends must be available. For a development smoke run against the local sample bundle:
    ```bash
-   OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \
    python -m dtm_from_mapillary.cli.pipeline run \
      --dataset-dir data/sample_dataset \
      --imagery-root data/sample_dataset/imagery \
-     --out-dir data/sample_dataset/outputs \
-     --allow-synthetic --no-strict-production
+     --out-dir data/sample_dataset/outputs
    ```
    Validate the local sample bundle without running the full pipeline:
    ```bash
@@ -156,8 +154,7 @@ dtm_from_mapillary/
      --imagery-root data/sample_dataset/imagery \
      --reference-dtm qa/data/qa_dtm.tif \
      --out-dir data/sample_dataset/outputs/production_qa \
-     --enforce-breaklines \
-     --strict-production
+     --enforce-breaklines
    ```
    
    **Optional: Enable learned uncertainty calibration:**
@@ -212,7 +209,7 @@ dtm_from_mapillary/
      --aoi-bbox "-122.45,37.76,-122.41,37.79" \
      --out-dir ./out
    ```
-   > Set `MONODEPTH_DEVICE=cuda` and (optionally) `MONODEPTH_USE_GPU=1` to leverage GPUs when PyTorch is available; falls back to synthetic depth otherwise.
+   > Set `MONODEPTH_DEVICE=cuda` and (optionally) `MONODEPTH_USE_GPU=1` to leverage GPUs when PyTorch is available.
 
    **Combined: All advanced features:**
    ```bash
@@ -237,7 +234,7 @@ dtm_from_mapillary/
    - `out/qa/dz.tif`, `out/qa/abs_dz.tif`, `out/qa/slope_diff_deg.tif` when `--reference-dtm` is supplied
    - Cache root (metadata & imagery): `cache/mapillary/`
 
-> Advanced: To replay a canned OpenSfM reconstruction without invoking the binary, set `OPEN_SFM_FIXTURE=qa/data/opensfm_fixture/reconstruction.json`. Use `OPEN_SFM_FORCE_SYNTHETIC=1` to skip adapter attempts.
+> Advanced: To replay a canned OpenSfM reconstruction without invoking the binary, set `OPEN_SFM_FIXTURE=qa/data/opensfm_fixture/reconstruction.json`.
 
 ---
 

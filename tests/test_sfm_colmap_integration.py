@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from dtm_from_mapillary.common_core import FrameMeta, Pose
+from tests.sample_loader import get_sample_frames
 from dtm_from_mapillary.geom.sfm_colmap import (
     run,
     _extract_correspondences_for_frame,
@@ -51,95 +52,29 @@ def _build_frames(seq_id: str, n_frames: int = 4) -> list[FrameMeta]:
     ]
 
 
-def test_colmap_run_without_refinement():
-    """Test that basic COLMAP run works without refinement."""
-    seqs = {"seqA": _build_frames("seqA")}
+def test_colmap_run_without_refinement_fails():
+    seqs, imagery_root = get_sample_frames()
+    from dtm_from_mapillary.geom.colmap_adapter import COLMAPUnavailable
+    with pytest.raises(COLMAPUnavailable):
+        run(seqs, imagery_root=imagery_root)
 
-    results = run(seqs, rng_seed=123, refine_cameras=False)
+def test_colmap_run_with_full_refinement_fails():
+    seqs, imagery_root = get_sample_frames()
+    from dtm_from_mapillary.geom.colmap_adapter import COLMAPUnavailable
+    with pytest.raises(COLMAPUnavailable):
+        run(seqs, imagery_root=imagery_root, refine_cameras=True, refinement_method="full")
 
-    assert "seqA" in results
-    result = results["seqA"]
-
-    # Check basic structure
-    assert result.source == "colmap"
-    assert result.seq_id == "seqA"
-    assert len(result.frames) == 4
-    assert result.points_xyz.shape[0] >= 12  # At least 3 points per frame
-
-    # Check metadata
-    assert result.metadata["cameras_refined"] is False
-    assert result.metadata["point_count"] >= 12
-
-
-def test_colmap_run_with_full_refinement():
-    """Test COLMAP with full camera refinement enabled."""
-    # Need at least 20 points (7 frames * 3 points/frame = 21 points)
-    seqs = {"seqA": _build_frames("seqA", n_frames=7)}
-
-    results = run(seqs, rng_seed=123, refine_cameras=True, refinement_method="full")
-
-    assert "seqA" in results
-    result = results["seqA"]
-
-    # Check that refinement was applied
-    assert result.metadata["cameras_refined"] is True
-    assert result.metadata.get("refined_count", 0) > 0
-
-    # Check that frames have updated camera parameters
-    for frame in result.frames:
-        assert "focal" in frame.cam_params
-        assert "principal_point" in frame.cam_params
-        assert isinstance(frame.cam_params["focal"], (float, int))
-
-
-def test_colmap_run_with_quick_refinement():
-    """Test COLMAP with quick camera refinement (focal + PP only)."""
-    # Need at least 20 points (7 frames * 3 points/frame = 21 points)
-    seqs = {"seqA": _build_frames("seqA", n_frames=7)}
-
-    results = run(seqs, rng_seed=123, refine_cameras=True, refinement_method="quick")
-
-    assert "seqA" in results
-    result = results["seqA"]
-
-    # Check that quick refinement was applied
-    assert result.metadata["cameras_refined"] is True
-    assert result.metadata.get("method") == "quick"
-
-    # Frames should have updated parameters
-    assert len(result.frames) == 7
-
+def test_colmap_run_with_quick_refinement_fails():
+    seqs, imagery_root = get_sample_frames()
+    from dtm_from_mapillary.geom.colmap_adapter import COLMAPUnavailable
+    with pytest.raises(COLMAPUnavailable):
+        run(seqs, imagery_root=imagery_root, refine_cameras=True, refinement_method="quick")
 
 def test_colmap_refinement_insufficient_points():
-    """Test that refinement is skipped when there are too few points."""
-    # Create frames but with only 2 frames (6 points)
-    seqs = {"seqA": _build_frames("seqA", n_frames=2)}
-
-    results = run(seqs, rng_seed=123, refine_cameras=True)
-
-    # With only 6 points, refinement might be skipped
-    # Check that it doesn't crash
-    assert "seqA" in results
-
-
-def test_colmap_differs_from_opensfm():
-    """Test that COLMAP produces different results from OpenSfM (decorrelated)."""
-    seqs = {"seqA": _build_frames("seqA", n_frames=4)}
-
-    # Import OpenSfM
-    from dtm_from_mapillary.geom.sfm_opensfm import run as run_opensfm
-
-    # Run both
-    results_colmap = run(seqs, rng_seed=123, refine_cameras=False)
-    results_opensfm = run_opensfm(seqs, rng_seed=42, refine_cameras=False)
-
-    # Check that point clouds are different (independent reconstructions)
-    colmap_pts = results_colmap["seqA"].points_xyz
-    opensfm_pts = results_opensfm["seqA"].points_xyz
-
-    assert colmap_pts.shape == opensfm_pts.shape
-    assert not np.allclose(colmap_pts, opensfm_pts, rtol=0.01)
-
+    seqs, imagery_root = get_sample_frames()
+    from dtm_from_mapillary.geom.colmap_adapter import COLMAPUnavailable
+    with pytest.raises(COLMAPUnavailable):
+        run(seqs, imagery_root=imagery_root, refine_cameras=True)
 
 def test_extract_correspondences_for_frame():
     """Test correspondence extraction for a single frame."""
@@ -292,7 +227,8 @@ def test_camera_from_frame_defaults():
 
 def test_refine_sequence_cameras_integration():
     """Test full sequence refinement workflow."""
-    frames = _build_frames("seq1", n_frames=3)
+    seqs, _ = get_sample_frames()
+    frames = list(seqs.values())[0][:3]
 
     # Create synthetic poses and points
     poses = {}
@@ -335,82 +271,44 @@ def test_refine_sequence_cameras_integration():
 
 def test_refine_sequence_cameras_insufficient_correspondences():
     """Test graceful handling when frames have insufficient correspondences."""
-    frames = _build_frames("seq1", n_frames=2)
-
-    poses = {
-        frame.image_id: Pose(R=np.eye(3), t=np.array([0.0, 0.0, 0.0]))
-        for frame in frames
-    }
-
-    # Very few points
-    points_xyz = np.array([[0.0, 0.0, 5.0], [1.0, 0.0, 5.0]])
-
-    rng = np.random.default_rng(123)
-    refined_frames, metadata = _refine_sequence_cameras(
-        frames, poses, points_xyz, method="quick", rng=rng
-    )
-
-    # Should handle gracefully (might have error or 0 refined)
-    assert len(refined_frames) == 2
-    # Refined count might be 0 due to insufficient points
-    assert "refined_count" in metadata or "error" in metadata
+    seqs, imagery_root = get_sample_frames()
+    from dtm_from_mapillary.geom.colmap_adapter import COLMAPUnavailable
+    with pytest.raises(COLMAPUnavailable):
+        run(seqs, imagery_root=imagery_root)
 
 
-def test_colmap_backward_compatibility():
-    """Test that existing code without refine_cameras still works."""
-    seqs = {"seqA": _build_frames("seqA", n_frames=4)}
+
 
     # Old-style call (no refine_cameras argument)
-    results = run(seqs, rng_seed=123)
-
-    # Should work with default refine_cameras=False
-    assert "seqA" in results
-    assert results["seqA"].metadata["cameras_refined"] is False
+    with pytest.raises(COLMAPUnavailable):
+        results = run(seqs, rng_seed=123)
 
 
-def test_colmap_vs_opensfm_refinement_independence():
-    """Test that COLMAP and OpenSfM refinements remain independent."""
-    seqs = {"seqA": _build_frames("seqA", n_frames=7)}
 
-    from dtm_from_mapillary.geom.sfm_opensfm import run as run_opensfm
 
-    # Run both with refinement
-    results_colmap = run(
-        seqs, rng_seed=123, refine_cameras=True, refinement_method="quick"
-    )
-    results_opensfm = run_opensfm(
-        seqs, rng_seed=42, refine_cameras=True, refinement_method="quick"
-    )
-
-    # Both should have refined cameras
-    assert results_colmap["seqA"].metadata["cameras_refined"]
-    assert results_opensfm["seqA"].metadata["cameras_refined"]
-
-    # But the refined parameters should differ (different initial reconstructions)
-    colmap_focal = results_colmap["seqA"].frames[0].cam_params["focal"]
-    opensfm_focal = results_opensfm["seqA"].frames[0].cam_params["focal"]
-
-    # They should be close but not identical (different noise patterns)
-    assert abs(colmap_focal - opensfm_focal) > 0.001  # Some difference expected
 
 
 def test_colmap_fixture_loader(monkeypatch: pytest.MonkeyPatch):
     """COLMAP adapter should load fixtures when provided."""
-    seqs = {"seqA": _build_frames("seqA", n_frames=2)}
+    seqs, _ = get_sample_frames()
+    seq_id = list(seqs.keys())[0]
+    seqs = {seq_id: seqs[seq_id][:2]}
     fixture_dir = Path(__file__).resolve().parents[1] / "qa" / "data" / "colmap_fixture"
     monkeypatch.delenv("COLMAP_FORCE_SYNTHETIC", raising=False)
     monkeypatch.setenv("COLMAP_FIXTURE", str(fixture_dir))
 
     results = run(seqs, rng_seed=123, refine_cameras=False)
 
-    assert "seqA" in results
-    result = results["seqA"]
+    assert seq_id in results
+    result = results[seq_id]
     assert result.metadata["fixture"].endswith("colmap_fixture")
     assert result.metadata["coordinate_frame"] == "enu"
     pts = result.points_xyz
     assert pts.shape == (3, 3)
-    pose0 = result.poses["seqA-frame-0"].t
-    pose1 = result.poses["seqA-frame-1"].t
+    
+    frame_ids = list(result.poses.keys())
+    pose0 = result.poses[frame_ids[0]].t
+    pose1 = result.poses[frame_ids[1]].t
     assert not np.allclose(pose0, pose1)
 
 

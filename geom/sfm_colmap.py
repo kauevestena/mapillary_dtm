@@ -440,7 +440,6 @@ def run(
     force: bool = False,
     workspace_root: Optional[str | os.PathLike[str]] = None,
     imagery_root: Optional[str | os.PathLike[str]] = None,
-    allow_synthetic: bool = True,
     progress: bool = False,
 ) -> Dict[str, ReconstructionResult]:
     """
@@ -486,27 +485,11 @@ def run(
                     rng_seed=rng_seed,
                 )
                 return processed
-        except COLMAPUnavailable as exc:
-            if not allow_synthetic:
-                raise
-            logger.info("COLMAP unavailable: %s; using synthetic fallback", exc)
         except Exception as exc:  # pragma: no cover - unexpected adapter failure
-            if not allow_synthetic:
-                raise
-            logger.exception(
-                "COLMAP adapter failed: %s; falling back to synthetic path",
-                exc,
-            )
+            logger.exception("COLMAP adapter failed: %s", exc)
+            raise
 
-    if not allow_synthetic:
-        raise COLMAPUnavailable("COLMAP synthetic fallback disabled and no real reconstruction was produced")
-
-    return _run_synthetic(
-        seqs,
-        rng_seed=rng_seed,
-        refine_cameras=refine_cameras,
-        refinement_method=refinement_method,
-    )
+    raise RuntimeError("COLMAP failed or was not invoked")
 
 
 def _yaw_perturb(R: np.ndarray, delta: float) -> np.ndarray:

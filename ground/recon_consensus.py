@@ -56,10 +56,8 @@ def agree(
     _accumulate(ptsB, "B")
     _accumulate(ptsC, "C")
 
-    # Determine minimum agreeing sources. Default to 1 to allow single-source points in sparse runs,
-    # unless strictly mandated.
-    import os
-    min_sources = 1 if (os.getenv("STRICT_PRODUCTION_CONSENSUS") != "1") else 2
+    # Determine minimum agreeing sources. Always require 2 for consensus.
+    min_sources = 2
 
     if not data:
         return []

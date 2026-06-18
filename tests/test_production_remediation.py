@@ -77,7 +77,7 @@ def test_grid_transform_is_georeferenced() -> None:
 def test_opensfm_strict_mode_does_not_fallback_to_synthetic(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPEN_SFM_FORCE_SYNTHETIC", "1")
     with pytest.raises(OpenSfMUnavailable):
-        run_opensfm({"seq-1": [_frame()]}, allow_synthetic=False)
+        run_opensfm({"seq-1": [_frame()]})
 
 
 def test_sample_dataset_validator_reports_qa_incomplete(tmp_path: Path) -> None:
@@ -186,7 +186,6 @@ def test_fixture_pipeline_smoke_produces_artifacts(tmp_path: Path, monkeypatch: 
     manifest = run_pipeline(
         dataset_dir=str(dataset),
         out_dir=str(dataset / "outputs"),
-        allow_synthetic=True,
         strict_production=False,
     )
 

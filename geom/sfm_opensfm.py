@@ -262,107 +262,6 @@ def _camera_from_frame(frame: FrameMeta) -> Dict:
     return camera
 
 
-def _run_synthetic(
-    seqs: Mapping[str, List[FrameMeta]],
-    rng_seed: int = 2025,
-    refine_cameras: bool = False,
-    refinement_method: str = "full",
-) -> Dict[str, ReconstructionResult]:
-    """
-    Produce lightweight pseudo-reconstructions for testing/integration.
-
-    Args:
-        seqs: Mapping of sequence_id -> list of FrameMeta
-        rng_seed: Random seed for reproducibility
-        refine_cameras: If True, apply self-calibration to camera parameters
-        refinement_method: 'full' for complete refinement, 'quick' for fast path
-
-    Returns:
-        Dictionary of sequence_id -> ReconstructionResult with refined cameras (if enabled)
-    """
-
-    rng = np.random.default_rng(rng_seed)
-    results: Dict[str, ReconstructionResult] = {}
-
-    for seq_id, frames in seqs.items():
-        if not frames:
-            continue
-
-        positions, _ = positions_from_frames(frames)
-        if positions.size == 0:
-            continue
-
-        poses = {}
-        points: List[np.ndarray] = []
-        offsets = synthetic_ground_offsets()
-
-        for idx, frame in enumerate(frames):
-            base_pos = positions[idx]
-            noise = rng.normal(scale=0.05, size=3)
-            pos = base_pos + noise
-            R = heading_matrix(positions, idx)
-            poses[frame.image_id] = Pose(R=R, t=pos)
-
-            # Generate points in camera coordinates, then transform to world
-            # This ensures points are in front of the camera
-            for offset in offsets:
-                # Transform offset from camera coords to world coords
-                # In camera coords: X=right, Y=down, Z=forward
-                # offset is in world coords (X,Y,Z), treating Z as vertical
-                # We want points ahead and below the camera
-                offset_cam = np.array(
-                    [offset[0], offset[2], 5.0]
-                )  # X, Y=down, Z=forward (5m ahead)
-                offset_world = R @ offset_cam  # Transform to world
-                jitter = rng.normal(scale=0.08, size=3)
-                points.append(pos + offset_world + jitter)
-
-        points_xyz = np.vstack(points) if points else np.zeros((0, 3), dtype=float)
-
-        # Store initial reconstruction
-        metadata = {
-            "rng_seed": rng_seed,
-            "point_count": int(points_xyz.shape[0]),
-            "cameras_refined": False,
-            "coordinate_frame": "enu",
-            "source_type": "synthetic",
-        }
-
-        # Apply self-calibration if requested
-        refined_frames = frames
-        if refine_cameras and len(frames) > 0 and points_xyz.shape[0] >= 20:
-            try:
-                refined_frames, refine_meta = _refine_sequence_cameras(
-                    frames=frames,
-                    poses=poses,
-                    points_xyz=points_xyz,
-                    method=refinement_method,
-                    rng=rng,
-                )
-                metadata.update(refine_meta)
-                metadata["cameras_refined"] = True
-                logger.info(
-                    f"OpenSfM sequence {seq_id}: Camera refinement successful "
-                    f"({refine_meta.get('refined_count', 0)}/{len(frames)} cameras)"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"OpenSfM sequence {seq_id}: Camera refinement failed: {e}"
-                )
-                refined_frames = frames  # Fall back to original
-
-        results[seq_id] = ReconstructionResult(
-            seq_id=seq_id,
-            frames=list(refined_frames),
-            poses=poses,
-            points_xyz=points_xyz.astype(np.float32),
-            source="opensfm",
-            metadata=metadata,
-        )
-
-    return results
-
-
 def run(
     seqs: Mapping[str, List[FrameMeta]],
     rng_seed: int = 2025,
@@ -371,7 +270,6 @@ def run(
     *,
     imagery_root: Optional[str | os.PathLike[str]] = None,
     workspace_root: Optional[str | os.PathLike[str]] = None,
-    allow_synthetic: bool = True,
     force: bool = False,
     progress: bool = False,
 ) -> Dict[str, ReconstructionResult]:
@@ -397,21 +295,8 @@ def run(
             if results:
                 logger.info("OpenSfM adapter produced results using %s", fixture or "binary invocation")
                 return results
-        except OpenSfMUnavailable as exc:
-            if not allow_synthetic:
-                raise
-            logger.info("OpenSfM unavailable: %s; using synthetic fallback", exc)
         except Exception as exc:
-            if not allow_synthetic:
-                raise
-            logger.exception("OpenSfM adapter failed: %s; falling back to synthetic path", exc)
+            logger.error("OpenSfM unavailable: %s", exc)
+            raise
 
-    if not allow_synthetic:
-        raise OpenSfMUnavailable("OpenSfM synthetic fallback disabled and no real reconstruction was produced")
-
-    return _run_synthetic(
-        seqs,
-        rng_seed=rng_seed,
-        refine_cameras=refine_cameras,
-        refinement_method=refinement_method,
-    )
+    raise RuntimeError("OpenSfM failed or was not invoked")

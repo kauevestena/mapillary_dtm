@@ -180,6 +180,7 @@ qa/data/*
 !qa/data/colmap_fixture/
 !qa/data/consensus_fixture/
 !qa/data/colmap_fixture/**
+!qa/data/sample_dataset
 
 # big files:
 models/huggingface/

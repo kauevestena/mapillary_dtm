@@ -26,9 +26,7 @@ def run(
     rng_seed: int = 3025,
     *,
     imagery_root: Optional[Path | str] = None,
-    force_synthetic: bool = False,
     min_inliers: Optional[int] = None,
-    allow_synthetic: bool = True,
     progress: bool = False,
 ) -> Dict[str, ReconstructionResult]:
     """
@@ -47,18 +45,11 @@ def run(
         int(min_inliers or constants.VO_MIN_INLIERS),
     )
 
-    if force_synthetic or cv2 is None:
-        if not allow_synthetic:
-            raise RuntimeError("VO synthetic fallback disabled and OpenCV/real VO is unavailable")
-        if force_synthetic:
-            log.info("VO forced to synthetic mode (flag or CLI)")
-        elif cv2 is None:
-            log.info("OpenCV not available; using synthetic VO path")
-        return _run_synthetic(seqs, rng_seed=rng_seed)
+    if cv2 is None:
+        raise RuntimeError("VO requires OpenCV")
 
     results: Dict[str, ReconstructionResult] = {}
     loader = ImageryLoader(imagery_root)
-    used_synthetic = False
 
     for seq_id, frames in _progress_iter(seqs.items(), "VO", progress):
         if not frames:
@@ -69,21 +60,12 @@ def run(
             frames,
             loader,
             min_inliers=min_inliers,
-            allow_synthetic_steps=allow_synthetic,
+            allow_synthetic_steps=False,
         )
         if track is None:
-            if not allow_synthetic:
-                raise RuntimeError(f"VO failed for {seq_id} and synthetic fallback is disabled")
-            used_synthetic = True
-            syn = _run_synthetic({seq_id: frames}, rng_seed=rng_seed)
-            if syn:
-                results.update(syn)
-            continue
+            raise RuntimeError(f"VO failed for {seq_id}")
 
         results[seq_id] = track
-
-    if used_synthetic:
-        log.info("VO fallback to synthetic path for some sequences (missing imagery or low match count)")
 
     return results
 

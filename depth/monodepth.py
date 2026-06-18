@@ -182,7 +182,6 @@ def predict_depths(
     adapter: Optional[_DepthAdapter] = None,
     imagery_root: Optional[Path | str] = None,
     use_gpu: Optional[bool] = None,
-    allow_synthetic: bool = True,
     progress: bool | None = None,
 ) -> CacheResult:
     """Return (and cache) depth/uncertainty maps for each frame."""
@@ -194,7 +193,7 @@ def predict_depths(
 
     results: CacheResult = {}
     rng = np.random.default_rng(seed)
-    require_provenance = not allow_synthetic
+    require_provenance = True
     cached_count = 0
     generated_count = 0
     total_frames = sum(len(frames) for frames in seqs.values())
@@ -231,7 +230,7 @@ def predict_depths(
                         continue
 
                 if not adapter_initialized:
-                    if _should_init_default_adapter(allow_synthetic=allow_synthetic):
+                    if _should_init_default_adapter():
                         adapter = _init_default_adapter(imagery_root=imagery_root, use_gpu=use_gpu)
                     adapter_initialized = True
 
@@ -249,24 +248,11 @@ def predict_depths(
                         provenance = adapter.provenance()
 
                 if depth is None or uncert is None:
-                    if not allow_synthetic:
-                        raise RuntimeError(
-                            "Monodepth prediction unavailable and synthetic depth is disabled. "
-                            "Provide provenanced cached depth maps, set MONODEPTH_MODEL_PATH, "
-                            "or cache the configured Hugging Face depth model."
-                        )
-                    depth, uncert = _synthesize_depth(
-                        frame,
-                        resolution=resolution,
-                        rng=rng,
-                        frame_index=index,
+                    raise RuntimeError(
+                        "Monodepth prediction unavailable. "
+                        "Provide provenanced cached depth maps, set MONODEPTH_MODEL_PATH, "
+                        "or cache the configured Hugging Face depth model."
                     )
-                    provenance = {
-                        "source_type": "synthetic",
-                        "backend": "procedural",
-                        "model_id": None,
-                        "model_revision": None,
-                    }
 
                 _write_depth(cache_path, depth, uncert, provenance=provenance)
                 generated_count += 1
@@ -398,10 +384,8 @@ def _init_default_adapter(
         return None
 
 
-def _should_init_default_adapter(*, allow_synthetic: bool) -> bool:
+def _should_init_default_adapter() -> bool:
     if os.getenv("MONODEPTH_MODEL_PATH"):
-        return True
-    if not allow_synthetic:
         return True
     return "MONODEPTH_MODEL_ID" in os.environ and bool(os.getenv("MONODEPTH_MODEL_ID"))
 

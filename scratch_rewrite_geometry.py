@@ -1,4 +1,7 @@
-from __future__ import annotations
+from pathlib import Path
+
+p = Path("tests/test_geometry_scaffolding.py")
+content = """from __future__ import annotations
 
 import sys
 import types
@@ -53,3 +56,5 @@ def test_geometry_scaffolds_produce_results():
     assert vo[seq_id].source == "vo"
     assert vo[seq_id].points_xyz.size == 0
     assert vo[seq_id].metadata["mode"] == "opencv"
+"""
+p.write_text(content)

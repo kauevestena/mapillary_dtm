@@ -124,7 +124,6 @@ def test_ground_masks_cached_resume_does_not_initialize_model(
     result = ground_masks.prepare(
         {"seq-1": [frame]},
         out_dir=tmp_path,
-        allow_heuristic=False,
         progress=True,
     )
 
@@ -161,7 +160,6 @@ def test_monodepth_cached_resume_does_not_initialize_adapter(
     result = monodepth.predict_depths(
         {"seq-1": [frame]},
         out_dir=tmp_path,
-        allow_synthetic=False,
         progress=True,
     )
 

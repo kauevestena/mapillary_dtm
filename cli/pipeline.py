@@ -443,7 +443,6 @@ def run_pipeline(
                 seqs,
                 imagery_root_path=imagery_root_path,
                 reference_dtm=reference_dtm,
-                vo_force_synthetic=vo_force_synthetic,
             ),
             inputs={"strict_production": strict_production},
         )
@@ -578,12 +577,11 @@ def run_pipeline(
             lambda: run_vo(
                 seqs,
                 imagery_root=imagery_root_path,
-                force_synthetic=vo_force_synthetic,
                 min_inliers=vo_min_inliers,
                 allow_synthetic=allow_synthetic,
                 progress=progress_enabled,
             ),
-            inputs={"force_synthetic": vo_force_synthetic, "min_inliers": vo_min_inliers},
+            inputs={"min_inliers": vo_min_inliers},
             counts=lambda result: _reconstruction_counts(result),
         )
     timings["vo_s"] = time.perf_counter() - t0
@@ -912,7 +910,6 @@ def run_pipeline(
                 "sources": _summarize_reconstruction_sources(reconB),
             },
             "vo": {
-                "force_synthetic": vo_force_synthetic,
                 "min_inliers": int(vo_min_inliers)
                 if vo_min_inliers is not None
                 else constants.VO_MIN_INLIERS,
@@ -1046,7 +1043,7 @@ if typer is not None:
         imagery_per_sequence: int = 5,
         colmap_threads: int = typer.Option(
             constants.COLMAP_DEFAULT_THREADS,
-            help="Thread budget for COLMAP feature extraction / mapping.",
+            help="Thread budget for COLMAP feature extraction / reconstruction.",
         ),
         colmap_use_gpu: bool = typer.Option(
             constants.COLMAP_USE_GPU,
@@ -1055,10 +1052,6 @@ if typer is not None:
         legacy_vo: bool = typer.Option(
             False,
             help="Use the legacy OpenCV ORB VO pipeline instead of Deep-Image-Matching.",
-        ),
-        vo_force_synthetic: bool = typer.Option(
-            False,
-            help="Force the legacy synthetic VO path (skip imagery-backed VO).",
         ),
         vo_min_inliers: Optional[int] = typer.Option(
             None,
@@ -1104,8 +1097,6 @@ if typer is not None:
             Thread budget for COLMAP feature extraction / reconstruction
         colmap_use_gpu : bool
             Enable COLMAP GPU pipelines (requires CUDA build)
-        vo_force_synthetic : bool
-            Force the synthetic VO fallback path
         vo_min_inliers : int, optional
             Minimum VO inliers per frame pair
         """
@@ -1127,7 +1118,6 @@ if typer is not None:
             colmap_threads=colmap_threads,
             colmap_use_gpu=colmap_use_gpu,
             legacy_vo=legacy_vo,
-            vo_force_synthetic=vo_force_synthetic,
             vo_min_inliers=vo_min_inliers,
             resume=resume,
             force_stage=force_stage,
@@ -1355,7 +1345,6 @@ def _strict_preflight(
     *,
     imagery_root_path: Optional[Path],
     reference_dtm: Optional[str],
-    vo_force_synthetic: bool,
 ) -> dict[str, object]:
     checks: list[dict[str, object]] = []
 
@@ -1369,10 +1358,10 @@ def _strict_preflight(
     ]
     add(
         "synthetic env",
-        not forced_envs and not vo_force_synthetic,
+        not forced_envs,
         "no forced synthetic flags set"
-        if not forced_envs and not vo_force_synthetic
-        else f"forced synthetic flags present: {forced_envs}, vo_force_synthetic={vo_force_synthetic}",
+        if not forced_envs
+        else f"forced synthetic flags present: {forced_envs}",
     )
 
     if imagery_root_path is None or not imagery_root_path.exists():

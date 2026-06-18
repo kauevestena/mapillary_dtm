@@ -5,6 +5,7 @@ import types
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 if "dtm_from_mapillary" not in sys.modules:
@@ -18,21 +19,7 @@ from dtm_from_mapillary.common_core import FrameMeta
 from dtm_from_mapillary.depth.monodepth import predict_depths, _DepthAdapter
 
 
-def _build_frames(seq_id: str, n_frames: int = 3) -> list[FrameMeta]:
-    return [
-        FrameMeta(
-            image_id=f"{seq_id}-frame-{idx}",
-            seq_id=seq_id,
-            captured_at_ms=1_700_000_000_000 + idx * 50,
-            lon=-48.596 + 0.0001 * idx,
-            lat=-27.591 + 0.0001 * idx,
-            alt_ellip=12.0,
-            camera_type="perspective",
-            cam_params={"width": 800, "height": 600, "focal": 0.9},
-            quality_score=0.8,
-        )
-        for idx in range(n_frames)
-    ]
+from tests.sample_loader import get_sample_frames
 
 
 class _StubAdapter(_DepthAdapter):
@@ -47,14 +34,17 @@ class _StubAdapter(_DepthAdapter):
 
 
 def test_monodepth_adapter_outputs(tmp_path: Path):
-    frames = {"seqA": _build_frames("seqA", n_frames=2)}
+    seqs, _ = get_sample_frames()
+    seq_id = list(seqs.keys())[0]
+    frames = {seq_id: seqs[seq_id][:2]}
     adapter = _StubAdapter()
     results = predict_depths(frames, out_dir=tmp_path, adapter=adapter, force=True)
 
-    assert adapter.calls == ["seqA-frame-0", "seqA-frame-1"]
-    seq_res = results["seqA"]
-    depth = seq_res["seqA-frame-0"]["depth"]
-    uncert = seq_res["seqA-frame-0"]["uncertainty"]
+    frame_ids = [f.image_id for f in frames[seq_id]]
+    assert adapter.calls == frame_ids
+    seq_res = results[seq_id]
+    depth = seq_res[frame_ids[0]]["depth"]
+    uncert = seq_res[frame_ids[0]]["uncertainty"]
     assert depth.shape == (10, 16)
     assert np.allclose(uncert, 0.25)
 
@@ -64,9 +54,9 @@ class _NoneAdapter(_DepthAdapter):
         return None
 
 
-def test_monodepth_adapter_fallback(tmp_path: Path):
-    frames = {"seqA": _build_frames("seqA", n_frames=1)}
-    results = predict_depths(frames, out_dir=tmp_path, adapter=_NoneAdapter(), force=True)
-    depth = results["seqA"]["seqA-frame-0"]["depth"]
-    assert depth.ndim == 2
-    assert depth.size > 0
+def test_monodepth_adapter_fails_without_model(tmp_path: Path):
+    seqs, _ = get_sample_frames()
+    seq_id = list(seqs.keys())[0]
+    frames = {seq_id: seqs[seq_id][:1]}
+    with pytest.raises(RuntimeError, match="Monodepth prediction unavailable"):
+        predict_depths(frames, out_dir=tmp_path, adapter=_NoneAdapter(), force=True)

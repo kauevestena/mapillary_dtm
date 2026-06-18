@@ -1,4 +1,15 @@
 from __future__ import annotations
+import sys
+import types
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+if "dtm_from_mapillary" not in sys.modules:
+    pkg = types.ModuleType("dtm_from_mapillary")
+    pkg.__path__ = [str(ROOT)]
+    sys.modules["dtm_from_mapillary"] = pkg
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
 
 import time
 from pathlib import Path
@@ -8,6 +19,9 @@ from dtm_from_mapillary.common_core import FrameMeta
 from dtm_from_mapillary.ingest.sequence_scan import discover_sequences
 from dtm_from_mapillary.ingest.imagery_cache import prefetch_imagery
 from dtm_from_mapillary.ingest import cache_utils
+from tests.sample_loader import get_sample_frames
+import json
+SAMPLE_META_PATH = Path(__file__).resolve().parents[1] / "qa" / "data" / "sample_dataset" / "metadata.json"
 
 
 class _SequenceClient:
@@ -15,15 +29,17 @@ class _SequenceClient:
         self.fail_on_fetch = fail_on_fetch
         self.image_calls = 0
         self.meta_calls = 0
+        self.data = json.loads(SAMPLE_META_PATH.read_text())
+        self.seq_id = list(self.data.keys())[0]
 
     def list_sequence_ids_in_bbox(self, bbox: Sequence[float]) -> List[str]:
-        return ["seq-1"]
+        return [self.seq_id]
 
     def list_image_ids_in_sequence(self, seq_id: str, limit: int = 10_000) -> List[str]:
         if self.fail_on_fetch:
             raise AssertionError("list_image_ids_in_sequence should not be invoked when cache present")
         self.image_calls += 1
-        return ["img-1", "img-2"]
+        return [d["image_id"] for d in self.data[self.seq_id]]
 
     def get_images_meta(
         self,
@@ -34,20 +50,21 @@ class _SequenceClient:
         if self.fail_on_fetch:
             raise AssertionError("get_images_meta should not be invoked when cache present")
         self.meta_calls += 1
-        records: List[Dict] = []
-        for idx, image_id in enumerate(image_ids):
-            records.append(
-                {
-                    "id": image_id,
-                    "sequence_id": "seq-1",
-                    "geometry": {"coordinates": [1.0 + idx, 2.0 + idx, 3.0]},
-                    "captured_at": 0,
-                    "camera_type": "perspective",
-                    "camera_parameters": {},
-                    "quality_score": 0.9,
-                    "thumb_1024_url": f"https://example.com/{image_id}.jpg",
-                }
-            )
+        records = []
+        for img_id in image_ids:
+            for d in self.data[self.seq_id]:
+                if d["image_id"] == img_id:
+                    # Construct raw API format
+                    records.append({
+                        "id": img_id,
+                        "sequence_id": self.seq_id,
+                        "geometry": {"coordinates": [d["lon"], d["lat"], 3.0]},
+                        "captured_at": d["captured_at_ms"],
+                        "camera_type": d["camera_type"],
+                        "camera_parameters": d.get("camera_parameters", []),
+                        "quality_score": d.get("quality_score", 0.9),
+                        "thumb_1024_url": d.get("thumbnail_url"),
+                    })
         return records
 
     def list_images_in_bbox(self, bbox: Sequence[float], limit: int = 2_000) -> List[Dict]:
@@ -67,7 +84,7 @@ class _ImageryClient:
 
 
 def _bbox() -> Sequence[float]:
-    return (-1.0, -1.0, 3.0, 4.0)
+    return (-49.0, -28.0, -48.0, -27.0)
 
 
 def test_discover_sequences_caches_metadata(tmp_path: Path) -> None:
@@ -81,12 +98,12 @@ def test_discover_sequences_caches_metadata(tmp_path: Path) -> None:
         force_refresh=False,
     )
 
-    assert "seq-1" in sequences
-    frames = sequences["seq-1"]
-    assert len(frames) == 2
+    assert client.seq_id in sequences
+    frames = sequences[client.seq_id]
+    assert len(frames) == 4
     assert all(isinstance(frame, FrameMeta) for frame in frames)
-    assert frames[0].thumbnail_url == "https://example.com/img-1.jpg"
-    cache_file = cache_dir / "seq-1.jsonl"
+    assert frames[0].thumbnail_url is not None
+    cache_file = cache_dir / f"{client.seq_id}.jsonl"
     assert cache_file.exists()
     assert client.image_calls == 1
     assert client.meta_calls == 1
@@ -99,39 +116,29 @@ def test_discover_sequences_caches_metadata(tmp_path: Path) -> None:
         use_cache=True,
         force_refresh=False,
     )
-    assert "seq-1" in cached_sequences
+    assert cached_client.seq_id in cached_sequences
     assert cached_client.image_calls == 0
     assert cached_client.meta_calls == 0
 
 
 def test_prefetch_imagery_writes_files(tmp_path: Path) -> None:
     client = _ImageryClient()
-    frames = [
-        FrameMeta(
-            image_id="img-10",
-            seq_id="seq-10",
-            captured_at_ms=0,
-            lon=1.0,
-            lat=1.0,
-            alt_ellip=0.0,
-            camera_type="perspective",
-            cam_params={},
-            quality_score=0.9,
-            thumbnail_url="https://example.com/img-10.jpg",
-        )
-    ]
+    seqs, _ = get_sample_frames()
+    seq_id = list(seqs.keys())[0]
+    frames = seqs[seq_id][:1]
+    
     stats = prefetch_imagery(
-        {"seq-10": frames},
+        {seq_id: frames},
         client=client,
         cache_dir=tmp_path,
         max_per_sequence=2,
         resolution=512,
     )
 
-    seq_dir = tmp_path / "imagery" / "seq-10"
-    expected_path = seq_dir / "img-10_512.jpg"
+    seq_dir = tmp_path / "imagery" / seq_id
+    expected_path = seq_dir / f"{frames[0].image_id}_512.jpg"
     assert expected_path.exists()
-    assert stats == {"seq-10": 1}
+    assert stats == {seq_id: 1}
     assert client.downloaded[expected_path] == 1
 
 

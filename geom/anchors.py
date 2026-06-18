@@ -17,11 +17,8 @@ log = logging.getLogger(__name__)
 
 def find_anchors(
     seqs: Mapping[str, List[FrameMeta]],
-    token: str | None = None,
     cache_dir: Path | str = Path("cache/anchors"),
     sample_path: Path | str = Path("qa/data/sample_anchors.json"),
-    *,
-    allow_synthetic: bool = True,
 ) -> List[Anchor]:
     """Return vertical anchors per sequence.
 
@@ -45,13 +42,9 @@ def find_anchors(
         elif seq_id in sample_map:
             anchors = sample_map[seq_id]
             _write_cache(cache_dir, seq_id, anchors)
-        elif allow_synthetic:
-            anchors = _synthesize_anchors(seq_id, frames)
-            if anchors:
-                _write_cache(cache_dir, seq_id, anchors)
         else:
             anchors = []
-            log.info("No real/cached anchors for %s; continuing without synthetic anchors", seq_id)
+            log.info("No real/cached anchors for %s", seq_id)
 
         collected.extend(anchors)
 

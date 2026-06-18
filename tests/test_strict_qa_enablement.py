@@ -106,7 +106,7 @@ def test_strict_ground_masks_reject_unprovenanced_cache(
     monkeypatch.setattr(ground_masks, "_init_model_masker", lambda **kwargs: None)
 
     with pytest.raises(RuntimeError, match="Ground mask missing"):
-        ground_masks.prepare({"seq-1": [frame]}, out_dir=tmp_path, allow_heuristic=False)
+        ground_masks.prepare({"seq-1": [frame]}, out_dir=tmp_path)
 
 
 def test_strict_depth_rejects_unprovenanced_cache(
@@ -122,7 +122,7 @@ def test_strict_depth_rejects_unprovenanced_cache(
     monkeypatch.setattr(monodepth, "_init_default_adapter", lambda **kwargs: None)
 
     with pytest.raises(RuntimeError, match="Monodepth prediction unavailable"):
-        monodepth.predict_depths({"seq-1": [frame]}, out_dir=tmp_path, allow_synthetic=False)
+        monodepth.predict_depths({"seq-1": [frame]}, out_dir=tmp_path)
 
 
 def test_source_dtms_are_rasterized_on_fused_grid() -> None:
@@ -168,7 +168,6 @@ def test_strict_preflight_reports_missing_models(tmp_path: Path, monkeypatch: py
             {"seq-1": [_frame()]},
             imagery_root_path=tmp_path / "imagery",
             reference_dtm=None,
-            vo_force_synthetic=False,
         )
 
 

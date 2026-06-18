@@ -38,7 +38,6 @@ def prepare(
     *,
     model_path: Path | str | None = None,
     imagery_root: Path | str | None = None,
-    allow_heuristic: bool = True,
     progress: bool | None = None,
 ) -> Dict[str, List[Path]]:
     """Generate ground-probability masks for each frame.
@@ -77,7 +76,7 @@ def prepare(
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
-    require_provenance = not allow_heuristic
+    require_provenance = True
     model = None
     model_initialized = False
     cached_count = 0
@@ -108,27 +107,18 @@ def prepare(
                         )
                         continue
                 if not model_initialized:
-                    if _should_init_model_masker(model_path, allow_heuristic=allow_heuristic):
-                        model = _init_model_masker(model_path=model_path, imagery_root=imagery_root)
+                    model = _init_model_masker(model_path=model_path, imagery_root=imagery_root)
                     model_initialized = True
                 if model is not None:
                     prob = model.predict(frame)
                     if prob is not None:
                         provenance = model.provenance()
                 if prob is None:
-                    if not allow_heuristic:
-                        raise RuntimeError(
-                            "Ground mask missing and heuristic masks are disabled. "
-                            "Provide provenanced cached masks, set GROUND_MASK_MODEL_PATH, "
-                            "or cache the configured Hugging Face ground model."
-                        )
-                    prob = _synthesize_mask(frame, backend=backend)
-                    provenance = {
-                        "source_type": "heuristic",
-                        "backend": backend,
-                        "model_id": None,
-                        "model_revision": None,
-                    }
+                    raise RuntimeError(
+                        "Ground mask missing. "
+                        "Provide provenanced cached masks, set GROUND_MASK_MODEL_PATH, "
+                        "or cache the configured Hugging Face ground model."
+                    )
 
                 _write_mask(mask_path, prob, frame, provenance=provenance)
                 generated_count += 1

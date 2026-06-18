@@ -1,4 +1,8 @@
-from __future__ import annotations
+from pathlib import Path
+import re
+
+p = Path("tests/test_ground_masks.py")
+content = """from __future__ import annotations
 
 import sys
 import types
@@ -75,3 +79,5 @@ def test_prepare_force_overwrites_fails_without_model(tmp_path):
     # Force should ignore cache and try to predict, failing because model is absent
     with pytest.raises(RuntimeError, match="Ground mask missing"):
         prepare({seq_id: [frame]}, out_dir=tmp_path, force=True)
+"""
+p.write_text(content)

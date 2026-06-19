@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapillary DTM Pipeline Documentation</title>
+    <!-- Include Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -20,7 +22,7 @@
             padding: 0;
         }
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 40px 20px;
         }
@@ -46,6 +48,9 @@
             padding-bottom: 10px;
             margin-top: 0;
         }
+        h3 {
+            color: #cbd5e1;
+        }
         a {
             color: var(--accent);
             text-decoration: none;
@@ -55,15 +60,6 @@
             color: #7dd3fc;
             text-decoration: underline;
         }
-        .badge {
-            display: inline-block;
-            background-color: #334155;
-            padding: 4px 10px;
-            border-radius: 99px;
-            font-size: 0.85rem;
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
         .warning {
             border-left: 4px solid #f59e0b;
             padding-left: 15px;
@@ -71,7 +67,31 @@
             color: #cbd5e1;
             font-style: italic;
         }
+        .mermaid-container {
+            background-color: white; /* Mermaid renders best on light background */
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        code {
+            background-color: #334155;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
     </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        });
+    </script>
 </head>
 <body>
     <div class="container">
@@ -81,30 +101,126 @@
         </header>
 
         <div class="card">
-            <h2>Official Documentation</h2>
-            <p>Welcome to the official documentation for the Mapillary DTM Pipeline.</p>
-            <ul>
-                <li><a href="ARCHITECTURE.md">Architecture & Data Flow (ARCHITECTURE.md)</a></li>
-            </ul>
+            <h2>Architecture Overview</h2>
+            <p>This document describes the high-level architecture and data flow of the <code>mapillary_dtm</code> pipeline. The pipeline focuses on maximizing accuracy via redundancy and cross-validation, using multiple independent reconstruction backends, and strictly requiring ground-only semantic evidence.</p>
+            
+            <div class="mermaid-container">
+                <div class="mermaid">
+graph TD
+    %% Ingestion
+    subgraph Data Ingestion & Preflight
+        A[AOI Bounding Box] --> B(Mapillary API Client)
+        B --> C{Sequence Scanner}
+        C -->|Raw Sequences| D[Car-only Filter]
+        D --> E[Filtered Sequences]
+        E --> F[Imagery Fetch / Cache]
+    end
+
+    %% Semantics
+    subgraph Semantics
+        F --> G[Ground Masks Segmentation]
+        F --> H[Curb / Lane Extraction]
+    end
+
+    %% Geometry
+    subgraph Geometry Tracks
+        F --> I(OpenSfM Reconstruction)
+        F --> J(COLMAP / DIM Reconstruction)
+        F --> K(Visual Odometry - OpenCV)
+    end
+
+    %% Scale & Height Solver
+    subgraph Scale & Height
+        E --> L[Semantic Anchors Detection]
+        L --> M[Height & Scale Solver]
+        I --> M
+        J --> M
+        K --> M
+        M -->|Scale & Height| N(Metric Calibrated Trajectories)
+    end
+
+    %% Monodepth
+    subgraph Monocular Depth
+        F --> O[Midas Monodepth Prediction]
+    end
+
+    %% Ground Extraction
+    subgraph Ground Extraction
+        I --> P[Ground Point Extraction]
+        J --> P
+        K --> P
+        G --> P
+        N --> P
+        O --> P
+        P -->|Track A Ground Points| QA[Track A]
+        P -->|Track B Ground Points| QB[Track B]
+        P -->|Track C Ground Points| QC[Track C]
+    end
+
+    %% Consensus & TIN
+    subgraph Consensus & Boundary Fill
+        QA --> R{Consensus Agree}
+        QB --> R
+        QC --> R
+        R -->|Voxel Agreement| S[Consensus Ground Points]
+        
+        H --> T[3D Breakline Projection]
+        T --> U[Constrained TIN]
+        S --> U
+        
+        A --> V[OSMnx Corridor Polygon]
+        V --> W[Corridor Mask & TIN Sample]
+        U --> W
+        W --> X[Final 3D Points including Corridor Fill]
+    end
+
+    %% Fusion
+    subgraph Fusion & Smoothing
+        X --> Y[Heightmap Lower-Envelope Fusion]
+        Y --> Z[Edge-Aware Smoothing]
+        Z --> AA[0.5m DTM Raster]
+        AA --> AB[Slope Rasters]
+    end
+
+    %% QA & Export
+    subgraph QA & Output
+        AA --> AC[Internal QA - Agreement Maps]
+        AA --> AD[External QA vs Geotiff]
+        AA --> AE(HTML Report & TIFF/LAZ Export)
+    end
+                </div>
+            </div>
         </div>
 
         <div class="card">
-            <h2>Core Directives</h2>
+            <h2>Core Principles</h2>
+            <ol>
+                <li><strong>Strict Production Run:</strong> The pipeline strictly runs on actual models (e.g., PyTorch models for monodepth/segmentation, COLMAP, OpenSfM) and fails fast if the necessary infrastructure is unavailable. Mocks and synthetic fallbacks are strictly not used to guarantee data science integrity.</li>
+                <li><strong>Redundancy everywhere:</strong> Two independent SfM stacks (OpenSfM, COLMAP) plus VO, resolving consensus.</li>
+                <li><strong>Metric scale:</strong> Derived from constant camera height per sequence, GNSS distance consistency, and semantic footpoint anchors.</li>
+                <li><strong>Ground-only focus:</strong> 3D semantic voting from per-image ground masks; rejection of dynamic obstacles.</li>
+                <li><strong>Slope fidelity:</strong> Edge-aware smoothing and breakline enforcement preserving curbs/crowns.</li>
+            </ol>
+        </div>
+
+        <div class="card">
+            <h2>Core Directives & Testing Philosophy</h2>
             <div class="warning">
                 <strong>Strict Enforcement:</strong> This project strictly adheres to production-first methodologies.
             </div>
             <ul>
                 <li><strong>No Mocks Allowed:</strong> All tests and pipeline runs must utilize actual models, real data, and functioning reconstruction engines. Synthetic fallbacks are prohibited.</li>
-                <li><strong>No Parallel Implementations:</strong> Testing and QA scripts must inherently execute the core pipeline functions rather than implementing disconnected parallel logic.</li>
+                <li><strong>No Parallel Implementations:</strong> Testing and QA scripts must inherently execute the core pipeline functions rather than implementing disconnected parallel logic. What is tested is what is shipped.</li>
+                <li><strong>Sample Dataset:</strong> The <code>qa/data/sample_dataset</code> folder is the authoritative fixture for all QA, integration, and unit tests. Rely on this standardized dataset to guarantee reproducibility.</li>
             </ul>
         </div>
 
         <div class="card">
-            <h2>Development Information</h2>
-            <p>For more detailed guidelines, AI behavior instructions, and pipeline setup, please refer to the files located in the repository root:</p>
+            <h2>Further Reading & Developer Guidelines</h2>
+            <p>For detailed source code mapping, AI behavior instructions, and pipeline implementation details, please refer to the markdown files in the repository root:</p>
             <ul>
-                <li><a href="../README.md">README.md</a></li>
-                <li><a href="../agents.md">agents.md</a></li>
+                <li><a href="../README.md">README.md</a> - Project Setup and Quickstart</li>
+                <li><a href="../agents.md">agents.md</a> - AI Guide and Development Standards</li>
             </ul>
         </div>
     </div>

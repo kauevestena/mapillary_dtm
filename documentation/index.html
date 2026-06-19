@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapillary DTM Pipeline Documentation</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --accent: #38bdf8;
+            --card-bg: #1e293b;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        h1 {
+            font-size: 2.5rem;
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: var(--accent);
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        a:hover {
+            color: #7dd3fc;
+            text-decoration: underline;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #334155;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .warning {
+            border-left: 4px solid #f59e0b;
+            padding-left: 15px;
+            margin: 20px 0;
+            color: #cbd5e1;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mapillary DTM Pipeline</h1>
+            <p>High-precision 3D Digital Terrain Models from Crowdsourced Street-Level Imagery</p>
+        </header>
+
+        <div class="card">
+            <h2>Official Documentation</h2>
+            <p>Welcome to the official documentation for the Mapillary DTM Pipeline.</p>
+            <ul>
+                <li><a href="ARCHITECTURE.md">Architecture & Data Flow (ARCHITECTURE.md)</a></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Core Directives</h2>
+            <div class="warning">
+                <strong>Strict Enforcement:</strong> This project strictly adheres to production-first methodologies.
+            </div>
+            <ul>
+                <li><strong>No Mocks Allowed:</strong> All tests and pipeline runs must utilize actual models, real data, and functioning reconstruction engines. Synthetic fallbacks are prohibited.</li>
+                <li><strong>No Parallel Implementations:</strong> Testing and QA scripts must inherently execute the core pipeline functions rather than implementing disconnected parallel logic.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Development Information</h2>
+            <p>For more detailed guidelines, AI behavior instructions, and pipeline setup, please refer to the files located in the repository root:</p>
+            <ul>
+                <li><a href="../README.md">README.md</a></li>
+                <li><a href="../agents.md">agents.md</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

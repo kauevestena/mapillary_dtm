@@ -44,9 +44,9 @@ This guide helps AI coding assistants (like GitHub Copilot, Claude, GPT-4, etc.)
 
 ## 📁 Module Structure & Responsibilities
 
-### `docs/` - Project Documentation
-- **`ROADMAP.md`**: Detailed implementation tasks, milestones, and acceptance criteria
-- **`VERIFICATION_REPORT.md`**: Comprehensive verification of milestone completion status
+### `documentation/` - Project Documentation
+- **`index.html`**: Main landing page for documentation
+- **`ARCHITECTURE.md`**: Architecture and data flow overview
 
 ### `api/` - External Data Access
 - **`mapillary_client.py`**: Mapillary Graph API v4 wrapper (images, sequences, vector tiles)
@@ -315,10 +315,19 @@ M6: Implement plane-sweep ground densifier
 ```
 
 ### Pull Requests
-- Link to `docs/ROADMAP.md` task
 - Include acceptance criteria verification
 - Add/update tests
 - Update README.md if user-facing changes
+
+---
+
+## 🛑 Strict Execution Directives
+
+> **CRITICAL INSTRUCTION FOR ALL AI AGENTS:**
+>
+> 1. **NO MOCK STUFF ALLOWED:** All testing, validation, and execution MUST use real data, real model inferences, and authentic reconstruction paths. Using mocks, magic numbers, or synthetic data to bypass complex setup is explicitly forbidden. It is better to fail than to pretend.
+> 2. **NO PARALLEL STUFF:** When testing or validating pipeline functionality (e.g., via temporary scripts or sample tests), you MUST directly import and invoke the core pipeline functions. DO NOT implement parallel, ad-hoc execution paths or adapters. What is tested must be exactly what is shipped.
+> 3. **SAMPLE DATASET:** The `qa/data/sample_dataset` folder is the authoritative fixture for running tests. Rely on this dataset rather than creating new arbitrary data.
 
 ---
 
@@ -347,18 +356,14 @@ M6: Implement plane-sweep ground densifier
 **"Debug consensus failures"**
 → Visualize agreement maps from `ground/recon_consensus.py`; check `DZ_MAX_M`/`DSLOPE_MAX_DEG` thresholds
 
-**"Where is the roadmap/implementation plan?"**
-→ See **[docs/ROADMAP.md](docs/ROADMAP.md)** for detailed tasks and milestones
-
-**"How do I verify implementation status?"**
-→ See **[docs/VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)** for complete verification report
+**"Where is the architecture documentation?"**
+→ See **[documentation/index.html](documentation/index.html)** and **[documentation/ARCHITECTURE.md](documentation/ARCHITECTURE.md)**
 
 ---
 
 ## 📖 Further Reading
 
-- **[docs/ROADMAP.md](docs/ROADMAP.md)** - Detailed implementation tasks & acceptance criteria
-- **[docs/VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)** - Complete verification of milestone completion
+- [documentation/index.html](documentation/index.html) - Official Documentation
 - [README.md](README.md) - User-facing documentation & quickstart
 - [qa/data/readme.md](qa/data/readme.md) - QA dataset descriptions
 - **Mapillary API Docs**: https://www.mapillary.com/developer/api-documentation
@@ -372,14 +377,13 @@ M6: Implement plane-sweep ground densifier
 
 When assisting with this project:
 
-1. **Read** `README.md` and `docs/ROADMAP.md` first for context
+1. **Read** `README.md` and `documentation/ARCHITECTURE.md` first for context
 2. **Check** `constants.py` for configurable parameters
 3. **Understand** the triple-track (A/B/C) redundancy philosophy
-4. **Respect** the no-external-DTM constraint
+4. **Respect** the strict directives against mocking and parallel implementation paths
 5. **Preserve** slope fidelity in any fusion/smoothing changes
-6. **Test** changes against acceptance criteria from `docs/ROADMAP.md`
+6. **Test** changes against the QA sample dataset
 7. **Document** assumptions and trade-offs in code comments
-8. **Verify** implementation status in `docs/VERIFICATION_REPORT.md` if needed
 
 ---
 

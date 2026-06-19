@@ -1,14 +1,21 @@
 # DTM from Mapillary — High-Accuracy, Redundancy-Heavy Pipeline
 
-**Goal:** Generate a **0.5 m** ellipsoidal-height **DTM (ground-only)** and **slope maps** from Mapillary imager## Documentation
+**Goal:** Generate a **0.5 m** ellipsoidal-height **DTM (ground-only)** and **slope maps** from Mapillary imagery (car sequences only), maximizing **accuracy via redundancy** and **cross-validation**. No existing DTM is used except optionally as **initialization/QA**. The pipeline focuses on **slope fidelity** (accessibility mapping).
 
-- **[docs/ROADMAP.md](docs/ROADMAP.md)** - Detailed implementation tasks and acceptance criteria
-- **[docs/VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)** - Complete verification of milestone completion
+## Official Documentation
+- **[documentation/index.html](documentation/index.html)** - Main official documentation landing page
+- **[documentation/ARCHITECTURE.md](documentation/ARCHITECTURE.md)** - Architecture & Data Flow
 - **[agents.md](agents.md)** - Guide for AI coding assistants
+
+## Core Directives & Testing Philosophy
+
+> **STRICT ENFORCEMENT:** No mock stuff allowed. All implementations must use real data, real model inferences, and authentic reconstruction paths.
+> **PIPELINE INTEGRITY:** Don't implement parallel or ad-hoc scripts for testing. All validation, tests, and baby-steps MUST directly consume the core pipeline functions to ensure what is tested is exactly what is shipped.
+> **SAMPLE DATASET:** The folder `qa/data/sample_dataset` is the authoritative fixture for all pipeline component testing.
 
 ## Attribution & Terms
 
-Respect Mapillary's terms and attribution requirements. OSM data is © OpenStreetMap contributors. See `docs/ROADMAP.md` for QA steps and validation using official, held-out datasets.car sequences only), maximizing **accuracy via redundancy** and **cross-validation**. No existing DTM is used except optionally as **initialization/QA**. The pipeline focuses on **slope fidelity** (accessibility mapping).
+Respect Mapillary's terms and attribution requirements. OSM data is © OpenStreetMap contributors.
 
 **Highlights**
 - Uses **two independent SfM stacks** (OpenSfM & COLMAP) + a **Deep-Image-Matching (DIM)** densifier for redundancy. (Legacy OpenCV VO is available via `--legacy-vo`).
@@ -34,9 +41,9 @@ dtm_from_mapillary/
   requirements.txt
   .gitignore
 
-  docs/
-    ROADMAP.md
-    VERIFICATION_REPORT.md
+  documentation/
+    index.html
+    ARCHITECTURE.md
 
   api/
     mapillary_client.py

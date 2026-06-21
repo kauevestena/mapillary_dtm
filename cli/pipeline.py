@@ -280,8 +280,7 @@ def run_pipeline(
         Held-out reference DTM used for external QA.
     reference_nodata_values : str, optional
         Comma-separated reference values to treat as nodata for external QA.
-    allow_synthetic : bool
-        Permit synthetic/heuristic fallbacks for development and smoke tests.
+            Permit synthetic/heuristic fallbacks for development and smoke tests.
     strict_production : bool
         Fail when production prerequisites are missing instead of emitting
         plausible synthetic outputs.
@@ -973,10 +972,7 @@ if typer is not None:
             None,
             "--reference-nodata-values",
             help="Comma-separated reference values to treat as nodata for external QA."),
-        allow_synthetic: bool = typer.Option(
-            False,
-            help="Permit synthetic/heuristic fallbacks for development or smoke tests."),
-        strict_production: bool = typer.Option(
+                strict_production: bool = typer.Option(
             True,
             help="Fail when production prerequisites are missing."),
         use_learned_uncertainty: bool = False,

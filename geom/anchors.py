@@ -26,8 +26,7 @@ def find_anchors(
     1. Sequence-specific cache (`cache/anchors/<seq>.json`).
     2. Sample QA dataset (if sequence appears there).
     3. Synthetic heuristic using GNSS trajectory to place poles along curb
-       only when ``allow_synthetic`` is true.
-    """
+       """
 
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)

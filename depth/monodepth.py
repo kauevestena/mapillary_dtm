@@ -387,7 +387,7 @@ def _init_default_adapter(
 def _should_init_default_adapter() -> bool:
     if os.getenv("MONODEPTH_MODEL_PATH"):
         return True
-    return "MONODEPTH_MODEL_ID" in os.environ and bool(os.getenv("MONODEPTH_MODEL_ID"))
+    return bool(os.getenv("MONODEPTH_MODEL_ID", DEFAULT_MONODEPTH_MODEL_ID))
 
 
 def _downsample_prediction(
@@ -453,45 +453,6 @@ def _estimate_uncertainty(depth: np.ndarray) -> np.ndarray:
     mag_norm = mag / (np.max(mag) + 1e-6)
     uncert = 0.1 + 0.4 * np.clip(mag_norm, 0.0, 1.0)
     return np.clip(uncert, 0.1, 0.6).astype(np.float32)
-
-
-def _synthesize_depth(
-    frame: FrameMeta,
-    resolution: tuple[int, int],
-    rng: np.random.Generator,
-    frame_index: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    params = frame.cam_params or {}
-    width = float(params.get("width") or params.get("image_width") or 2048.0)
-    height = float(params.get("height") or params.get("image_height") or 1536.0)
-    aspect = width / max(height, 1.0)
-
-    rows_target, cols_target = resolution
-    cols = int(round(min(cols_target, rows_target * aspect)))
-    rows = int(round(max(rows_target // 2, rows_target)))
-    rows = max(16, rows)
-    cols = max(16, cols)
-
-    v = np.linspace(0.05, 1.0, rows, dtype=np.float32)
-    tilt = float(rng.normal(scale=0.05))
-    ground_depth = 8.0 + 20.0 * (1.0 - v)  # farther near horizon
-    ground_depth *= (1.0 + tilt * (v - 0.5))
-    depth = np.repeat(ground_depth[:, None], cols, axis=1)
-
-    # Introduce gentle undulation to mimic small bumps/curbs.
-    noise_rng = np.random.default_rng((abs(hash(frame.image_id)) + frame_index) & 0xFFFF)
-    perturb = noise_rng.normal(scale=0.25, size=depth.shape).astype(np.float32)
-    depth = depth + perturb
-    depth = np.clip(depth, 3.0, 60.0)
-
-    # Confidence decreases near horizon and for noisy pixels.
-    norm_row = v[:, None]
-    uncert = np.repeat(norm_row, cols, axis=1)
-    uncert = 0.1 + 0.4 * uncert
-    uncert += np.abs(perturb) * 0.02
-    uncert = np.clip(uncert, 0.1, 0.6).astype(np.float32)
-
-    return depth.astype(np.float32), uncert.astype(np.float32)
 
 
 def _write_depth(

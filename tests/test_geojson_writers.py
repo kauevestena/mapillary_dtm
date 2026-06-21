@@ -257,46 +257,59 @@ class TestWriteAllCameraPositionsGeojson:
     def test_combines_sources(self, tmp_path):
         reconA = {"seq001": _make_recon("seq001", n_frames=3)}
         reconB = {"seq002": _make_recon("seq002", n_frames=2)}
-        out = tmp_path / "all_cameras.geojson"
-        write_all_camera_positions_geojson(
+        out_dir = tmp_path / "geojsons"
+        paths = write_all_camera_positions_geojson(
             {"opensfm": reconA, "colmap": reconB},
             self.LON0, self.LAT0, self.H0,
-            out,
+            {"seq001": 1.0, "seq002": 1.0},
+            out_dir,
         )
-        data = json.loads(out.read_text())
-        assert len(data["features"]) == 5
+        assert len(paths) == 2
+        
+        data_a = json.loads(Path(paths[0]).read_text())
+        data_b = json.loads(Path(paths[1]).read_text())
+        assert len(data_a["features"]) + len(data_b["features"]) == 5
 
     def test_source_labels_preserved(self, tmp_path):
         reconA = {"seq001": _make_recon("seq001", n_frames=2)}
         reconB = {"seq002": _make_recon("seq002", n_frames=1)}
-        out = tmp_path / "all_cameras.geojson"
-        write_all_camera_positions_geojson(
+        out_dir = tmp_path / "geojsons"
+        paths = write_all_camera_positions_geojson(
             {"opensfm": reconA, "colmap": reconB},
             self.LON0, self.LAT0, self.H0,
-            out,
+            {"seq001": 1.0, "seq002": 1.0},
+            out_dir,
         )
-        data = json.loads(out.read_text())
-        sources = {f["properties"]["source"] for f in data["features"]}
+        
+        sources = set()
+        for p in paths:
+            data = json.loads(Path(p).read_text())
+            for f in data["features"]:
+                sources.add(f["properties"]["source"])
+                
         assert "opensfm" in sources
         assert "colmap" in sources
 
     def test_empty_reconstruction_skipped(self, tmp_path):
         reconA = {"seq001": _make_recon("seq001", n_frames=2)}
-        out = tmp_path / "all_cameras.geojson"
-        write_all_camera_positions_geojson(
+        out_dir = tmp_path / "geojsons"
+        paths = write_all_camera_positions_geojson(
             {"opensfm": reconA, "colmap": {}},
             self.LON0, self.LAT0, self.H0,
-            out,
+            {"seq001": 1.0},
+            out_dir,
         )
-        data = json.loads(out.read_text())
+        assert len(paths) == 1
+        data = json.loads(Path(paths[0]).read_text())
         assert len(data["features"]) == 2
 
     def test_valid_geojson_output(self, tmp_path):
         recon = {"seq001": _make_recon()}
-        out = tmp_path / "all_cameras.geojson"
-        write_all_camera_positions_geojson(
-            {"vo": recon}, self.LON0, self.LAT0, self.H0, out
+        out_dir = tmp_path / "geojsons"
+        paths = write_all_camera_positions_geojson(
+            {"vo": recon}, self.LON0, self.LAT0, self.H0, {"seq001": 1.0}, out_dir
         )
-        data = json.loads(out.read_text())
+        assert len(paths) == 1
+        data = json.loads(Path(paths[0]).read_text())
         assert data["type"] == "FeatureCollection"
         assert "crs" in data

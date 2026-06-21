@@ -167,11 +167,12 @@ def write_all_camera_positions_geojson(
     lon0: float,
     lat0: float,
     h0: float,
-    out_path: Path | str,
+    scales: Dict[str, float],
+    out_dir: Path | str,
     *,
     indent: int = 2,
-) -> str:
-    """Write a single GeoJSON combining camera positions from multiple sources.
+) -> List[str]:
+    """Write GeoJSON files combining calibrated camera positions.
 
     Parameters
     ----------
@@ -180,35 +181,44 @@ def write_all_camera_positions_geojson(
         For example ``{"opensfm": reconA, "colmap": reconB, "vo": vo}``.
     lon0, lat0, h0:
         ENU origin in WGS84.
-    out_path:
-        Destination file path.
+    scales:
+        Mapping of ``seq_id -> float`` from the height solver to scale translations.
+    out_dir:
+        Destination directory. Outputs will be named ``camera_positions_{source_label}.geojson``.
 
     Returns
     -------
-    str
-        Absolute path to the written file.
+    List[str]
+        Absolute paths to the written files.
     """
     from ..common_core import enu_to_wgs84
     import numpy as np
 
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    features: List[dict] = []
+    paths_written: List[str] = []
+
     for source_label, recon in reconstructions.items():
         if not recon:
             continue
+            
+        features: List[dict] = []
         for result in recon.values():
+            scale = float(scales.get(result.seq_id, 1.0))
             for frame in result.frames:
                 pose = result.poses.get(frame.image_id)
                 if pose is None:
                     continue
-                centre_enu = -pose.R.T @ pose.t
+                
+                # In our pipeline, pose.t already represents the camera center in ENU.
+                centre_enu_scaled = np.asarray(pose.t, dtype=float) * scale
+                
                 try:
                     lon, lat, h = enu_to_wgs84(
-                        float(centre_enu[0]),
-                        float(centre_enu[1]),
-                        float(centre_enu[2]),
+                        float(centre_enu_scaled[0]),
+                        float(centre_enu_scaled[1]),
+                        float(centre_enu_scaled[2]),
                         lon0, lat0, h0,
                     )
                 except Exception as exc:
@@ -227,16 +237,21 @@ def write_all_camera_positions_geojson(
                         "captured_at_ms": int(frame.captured_at_ms),
                         "camera_type": frame.camera_type,
                         "source": source_label,
+                        "applied_scale": scale,
                         "gnss_lon": float(frame.lon),
                         "gnss_lat": float(frame.lat),
                         "gnss_alt_ellip": float(frame.alt_ellip) if frame.alt_ellip is not None else None,
                     },
                 })
+        
+        if features:
+            collection = _feature_collection(features)
+            out_path = out_dir / f"camera_positions_{source_label}.geojson"
+            _write_geojson(out_path, collection, indent=indent)
+            log.info("Wrote %d calibrated SfM camera positions to %s", len(features), out_path)
+            paths_written.append(str(out_path))
 
-    collection = _feature_collection(features)
-    _write_geojson(out_path, collection, indent=indent)
-    log.info("Wrote %d combined SfM camera positions to %s", len(features), out_path)
-    return str(out_path)
+    return paths_written
 
 
 # ---------------------------------------------------------------------------

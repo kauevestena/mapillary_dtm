@@ -372,7 +372,7 @@ def run_pipeline(
 
     # Paths for GeoJSON metadata outputs
     frames_geojson_path = metadata_dir / "frames.geojson"
-    camera_positions_geojson_path = metadata_dir / "camera_positions.geojson"
+
 
     map_client: MapillaryClient | None = None
     t0 = time.perf_counter()
@@ -564,7 +564,7 @@ def run_pipeline(
             lambda found_anchors: (
                 found_anchors,
                 *solve_scale_and_h(reconA, reconB, vo, found_anchors, seqs))
-        )(find_anchors(seqs, token=token)),
+        )(find_anchors(seqs)),
         counts=lambda result: {
             "anchors": len(result[0]) if result[0] is not None else 0,
             "scales": len(result[1]) if result[1] is not None else 0,
@@ -776,14 +776,16 @@ def run_pipeline(
     agreement_results = write_agreement_maps(agreement_path, dtm_s, source_dtms)
     agreement_summary = _summarize_agreement(agreement_results)
 
-    # Write SfM-refined camera positions from all three sources combined so the
-    # user can overlay GNSS (frames.geojson) vs. SfM positions (camera_positions.geojson)
-    # directly in a GIS tool without any further post-processing.
+    # Write SfM-refined camera positions from all three sources, scaled properly.
+    # The user can overlay GNSS (frames.geojson) vs. SfM positions
+    # directly in a GIS tool.
+    camera_positions_geojson_paths = []
     try:
-        write_all_camera_positions_geojson(
+        camera_positions_geojson_paths = write_all_camera_positions_geojson(
             {"opensfm": reconA, "colmap": reconB, "vo": vo},
             lon0, lat0, h0,
-            camera_positions_geojson_path)
+            scales,
+            metadata_dir)
     except Exception as exc:
         log.warning("Failed to write camera positions GeoJSON: %s", exc)
         run_warnings.append(f"camera_positions GeoJSON write failed: {exc}")
@@ -795,7 +797,7 @@ def run_pipeline(
             "laz": laz_path,
             "agreement_maps": str(agreement_path),
             "frames_geojson": str(frames_geojson_path),
-            "camera_positions_geojson": str(camera_positions_geojson_path),
+            "camera_positions_geojsons": camera_positions_geojson_paths,
         },
         counts={
             "dtm_shape": list(dtm_s.shape),

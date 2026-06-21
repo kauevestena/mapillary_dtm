@@ -1,0 +1,275 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.59502985541722,
+          -27.58731099663242,
+          23.999475613236427
+        ]
+      },
+      "properties": {
+        "image_id": "487967815974661",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347868720,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594831899666,
+        "gnss_lat": -27.587340216216,
+        "gnss_alt_ellip": 10.148803669725
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.595003115891195,
+          -27.587313167920083,
+          24.18911794014275
+        ]
+      },
+      "properties": {
+        "image_id": "595114328129242",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347868907,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594812263897,
+        "gnss_lat": -27.587344650109,
+        "gnss_alt_ellip": 9.9777825688073
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.594961198791395,
+          -27.58731359120741,
+          24.2713389871642
+        ]
+      },
+      "properties": {
+        "image_id": "468020011157631",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347869092,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594792514753,
+        "gnss_lat": -27.587348663971,
+        "gnss_alt_ellip": 9.7901500996016
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.59491563920387,
+          -27.58731857717771,
+          24.588873678818345
+        ]
+      },
+      "properties": {
+        "image_id": "509059190130782",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347869276,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594772679616,
+        "gnss_lat": -27.587352325843,
+        "gnss_alt_ellip": 9.5887471115538
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.594855475058424,
+          -27.58733035907027,
+          24.872021078132093
+        ]
+      },
+      "properties": {
+        "image_id": "549798756007659",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347869643,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594733009343,
+        "gnss_lat": -27.587359649588,
+        "gnss_alt_ellip": 9.1859411354582
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.59483409793516,
+          -27.5873372917081,
+          24.95163513533771
+        ]
+      },
+      "properties": {
+        "image_id": "177246630949005",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347869827,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594713174206,
+        "gnss_lat": -27.587363311461,
+        "gnss_alt_ellip": 8.9845381474104
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.59480056864005,
+          -27.587345521698644,
+          24.322084908373654
+        ]
+      },
+      "properties": {
+        "image_id": "170058561705143",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347870010,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594693340517,
+        "gnss_lat": -27.587366979355,
+        "gnss_alt_ellip": 8.7956709127382
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.594776005080284,
+          -27.587347120179963,
+          24.300454535521567
+        ]
+      },
+      "properties": {
+        "image_id": "530796564614344",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347870182,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594673522337,
+        "gnss_lat": -27.587370713204,
+        "gnss_alt_ellip": 8.7439713139418
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.5947524822162,
+          -27.587349996958583,
+          24.473394081927836
+        ]
+      },
+      "properties": {
+        "image_id": "291129559315209",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347870354,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594653704042,
+        "gnss_lat": -27.587374447074,
+        "gnss_alt_ellip": 8.6922714142427
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.59472617509244,
+          -27.587360623304782,
+          24.35851663723588
+        ]
+      },
+      "properties": {
+        "image_id": "1197003347412468",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347870525,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594633885747,
+        "gnss_lat": -27.587378180944,
+        "gnss_alt_ellip": 8.6405715145436
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.59468765688613,
+          -27.58737163342441,
+          24.654986353591084
+        ]
+      },
+      "properties": {
+        "image_id": "3701671393289068",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347870697,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594614067568,
+        "gnss_lat": -27.587381914792,
+        "gnss_alt_ellip": 8.5888719157472
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -48.5946405258374,
+          -27.587383715054724,
+          25.047083044424653
+        ]
+      },
+      "properties": {
+        "image_id": "1464734177204763",
+        "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+        "captured_at_ms": 1562347870869,
+        "camera_type": "perspective",
+        "source": "opensfm",
+        "applied_scale": 1.5704954289521083,
+        "gnss_lon": -48.594594249273,
+        "gnss_lat": -27.587385648663,
+        "gnss_alt_ellip": 8.5371720160481
+      }
+    }
+  ]
+}

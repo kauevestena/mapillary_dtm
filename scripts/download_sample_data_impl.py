@@ -388,7 +388,6 @@ To enable external validation, place a reference DTM in `reference_dtm/`:
 
 ```bash
 # Basic run (ellipsoidal heights, 0.5m resolution)
-OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\
 python -m dtm_from_mapillary.cli.pipeline run \\
   --aoi-bbox "{bbox_str}" \\
   --dataset-dir {base_dir} \\
@@ -397,7 +396,6 @@ python -m dtm_from_mapillary.cli.pipeline run \\
   --allow-synthetic --no-strict-production
 
 # With breakline enforcement (curbs/edges)
-OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\
 python -m dtm_from_mapillary.cli.pipeline run \\
   --aoi-bbox "{bbox_str}" \\
   --dataset-dir {base_dir} \\
@@ -407,7 +405,6 @@ python -m dtm_from_mapillary.cli.pipeline run \\
   --allow-synthetic --no-strict-production
 
 # With learned uncertainty calibration
-OPEN_SFM_FORCE_SYNTHETIC=1 COLMAP_FORCE_SYNTHETIC=1 \\
 python -m dtm_from_mapillary.cli.pipeline run \\
   --aoi-bbox "{bbox_str}" \\
   --dataset-dir {base_dir} \\

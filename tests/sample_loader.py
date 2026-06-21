@@ -19,7 +19,7 @@ def get_sample_frames():
             captured_at_ms=d["captured_at_ms"],
             lon=d["lon"],
             lat=d["lat"],
-            alt_ellip=10.0,
+            alt_ellip=d.get("altitude", 10.0),
             camera_type=d["camera_type"],
             cam_params={"focal": d["camera_parameters"][0], "k1": d["camera_parameters"][1], "k2": d["camera_parameters"][2]} if d.get("camera_parameters") else {},
             quality_score=d.get("quality_score", 0.5),

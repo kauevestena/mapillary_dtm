@@ -150,17 +150,6 @@ def check_env_var(name: str, required: bool) -> Callable[[argparse.Namespace], R
     return _runner
 
 
-def check_no_forced_synthetic(_: argparse.Namespace) -> Result:
-    offenders = [
-        name
-        for name in ("OPEN_SFM_FORCE_SYNTHETIC", "COLMAP_FORCE_SYNTHETIC")
-        if os.getenv(name, "").lower() not in {"", "0", "false", "no", "off"}
-    ]
-    if offenders:
-        return False, "forced synthetic env vars set: " + ", ".join(offenders)
-    return True, "no forced synthetic env vars"
-
-
 def check_model_cache(
     env_path: str,
     env_model_id: str,

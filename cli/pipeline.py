@@ -37,16 +37,14 @@ from ..ground.corridor_fill_tin import (
     build_tin,
     build_constrained_tin,
     corridor_to_local,
-    sample_outside_corridor,
-)
+    sample_outside_corridor)
 from ..ground.ground_extract_3d import label_and_filter_points
 from ..ground.recon_consensus import agree as consensus_agree
 from ..ground.breakline_integration import (
     project_curbs_to_3d,
     merge_breakline_segments,
     simplify_breaklines,
-    densify_breaklines,
-)
+    densify_breaklines)
 from ..ingest.sequence_filter import filter_car_sequences
 from ..ingest.sequence_scan import discover_sequences
 from ..ingest.imagery_cache import prefetch_imagery as cache_sequence_imagery
@@ -87,8 +85,7 @@ class _RunState:
         *,
         resume: bool = True,
         force_stages: Optional[list[str]] = None,
-        inputs_fingerprint: Optional[str] = None,
-    ) -> None:
+        inputs_fingerprint: Optional[str] = None) -> None:
         self.path = path
         self.resume = bool(resume)
         self.payload: dict[str, Any] = self._load() if self.resume else {}
@@ -147,8 +144,7 @@ class _RunState:
         *,
         outputs: Optional[dict[str, Any]] = None,
         counts: Optional[dict[str, Any]] = None,
-        warnings: Optional[list[str]] = None,
-    ) -> None:
+        warnings: Optional[list[str]] = None) -> None:
         record = self.stage(name)
         record.update(
             {
@@ -227,8 +223,7 @@ def _run_stage(
     inputs: Optional[dict[str, Any]] = None,
     outputs=None,
     counts=None,
-    warnings=None,
-):
+    warnings=None):
     run_state.start(name, inputs=inputs)
     try:
         result = func()
@@ -239,8 +234,7 @@ def _run_stage(
         name,
         outputs=outputs(result) if callable(outputs) else outputs,
         counts=counts(result) if callable(counts) else counts,
-        warnings=warnings(result) if callable(warnings) else warnings,
-    )
+        warnings=warnings(result) if callable(warnings) else warnings)
     return result
 
 
@@ -252,8 +246,7 @@ def run_pipeline(
     imagery_root: Optional[str] = None,
     reference_dtm: Optional[str] = None,
     reference_nodata_values: Optional[str] = None,
-    allow_synthetic: bool = False,
-    strict_production: bool = True,
+        strict_production: bool = True,
     use_learned_uncertainty: bool = False,
     uncertainty_model_path: Optional[str] = None,
     enforce_breaklines: bool = False,
@@ -266,8 +259,7 @@ def run_pipeline(
     vo_min_inliers: Optional[int] = None,
     resume: bool = True,
     force_stage: Optional[list[str]] = None,
-    progress: Optional[bool] = None,
-) -> dict:
+    progress: Optional[bool] = None) -> dict:
     """
     Run the full pipeline over an AOI bbox or a local dataset bundle.
     Returns the manifest describing the run.
@@ -372,8 +364,7 @@ def run_pipeline(
     run_state = _RunState(
         out_path / "run_state.json",
         resume=resume,
-        force_stages=force_stage or [],
-    )
+        force_stages=force_stage or [])
     if resume and run_state.is_complete("external_qa_report") and _final_outputs_valid(out_path):
         return json.loads((out_path / "manifest.json").read_text(encoding="utf8"))
     dataset_path = Path(dataset_dir) if dataset_dir else None
@@ -406,8 +397,7 @@ def run_pipeline(
             "bbox": bbox,
         },
         counts=lambda loaded: _sequence_counts(loaded),
-        outputs=lambda loaded: {"frames_geojson": str(frames_geojson_path)},
-    )
+        outputs=lambda loaded: {"frames_geojson": str(frames_geojson_path)})
     # Write frame metadata as GeoJSON immediately after ingestion so the GNSS
     # camera positions are available for inspection before reconstruction runs.
     try:
@@ -422,9 +412,7 @@ def run_pipeline(
         dataset_dir=dataset_path,
         imagery_root=imagery_root_path,
         reference_dtm=reference_dtm,
-        strict_production=strict_production,
-        allow_synthetic=allow_synthetic,
-    )
+        strict_production=strict_production)
     previous_fingerprint = run_state.payload.get("inputs_fingerprint")
     if previous_fingerprint and previous_fingerprint != input_fingerprint:
         run_state.invalidate_from(["ingestion"])
@@ -442,16 +430,13 @@ def run_pipeline(
             lambda: _strict_preflight(
                 seqs,
                 imagery_root_path=imagery_root_path,
-                reference_dtm=reference_dtm,
-            ),
-            inputs={"strict_production": strict_production},
-        )
+                reference_dtm=reference_dtm),
+            inputs={"strict_production": strict_production})
     else:
         run_state.complete(
             "preflight",
             counts={"strict_production": False},
-            warnings=["strict production preflight skipped"],
-        )
+            warnings=["strict production preflight skipped"])
     timings["preflight_s"] = time.perf_counter() - t0
 
     imagery_cache_stats = {}
@@ -462,14 +447,12 @@ def run_pipeline(
             seqs,
             client=map_client,
             cache_dir=imagery_root_path,
-            max_per_sequence=imagery_per_sequence if imagery_per_sequence > 0 else None,
-        )
+            max_per_sequence=imagery_per_sequence if imagery_per_sequence > 0 else None)
         if imagery_cache_stats:
             log.info(
                 "Cached thumbnails for %d sequences (%d images)",
                 len(imagery_cache_stats),
-                sum(imagery_cache_stats.values()),
-            )
+                sum(imagery_cache_stats.values()))
     t0 = time.perf_counter()
     mask_index = _run_stage(
         run_state,
@@ -478,17 +461,13 @@ def run_pipeline(
             seqs,
             out_dir=mask_cache_dir,
             imagery_root=imagery_root_path,
-            allow_heuristic=allow_synthetic,
-            progress=progress_enabled,
-        ),
+                        progress=progress_enabled),
         inputs={
             "cache_dir": str(mask_cache_dir),
-            "allow_heuristic": allow_synthetic,
-            "resume": resume,
+                        "resume": resume,
         },
         outputs=lambda result: {"cache_dir": str(mask_cache_dir)},
-        counts=lambda result: _mask_cache_counts(seqs, mask_cache_dir, strict=not allow_synthetic),
-    )
+        counts=lambda result: _mask_cache_counts(seqs, mask_cache_dir, strict=True))
     timings["masks_s"] = time.perf_counter() - t0
 
     filter_sequences_by_mask(seqs, mask_cache_dir)
@@ -504,8 +483,7 @@ def run_pipeline(
         counts=lambda result: {
             "sequences": len(result),
             "lines": int(sum(len(lines) for lines in result.values())),
-        },
-    )
+        })
     timings["curbs_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -516,12 +494,9 @@ def run_pipeline(
             seqs,
             imagery_root=imagery_root_path,
             workspace_root=out_path / "cache" / "opensfm",
-            allow_synthetic=allow_synthetic,
-            progress=progress_enabled,
-        ),
+                        progress=progress_enabled),
         inputs={"workspace_root": str(out_path / "cache" / "opensfm")},
-        counts=lambda result: _reconstruction_counts(result),
-    )
+        counts=lambda result: _reconstruction_counts(result))
     timings["opensfm_s"] = time.perf_counter() - t0
     t0 = time.perf_counter()
     if not legacy_vo and constants.DIM_ENABLED:
@@ -532,14 +507,12 @@ def run_pipeline(
                 seqs,
                 imagery_root=imagery_root_path,
                 workspace_root=out_path / "cache" / "colmap",
-                progress=progress_enabled,
-            ),
+                progress=progress_enabled),
             inputs={
                 "workspace_root": str(out_path / "cache" / "colmap"),
             },
-            counts=lambda result: _reconstruction_counts(result),
-        )
-        if not allow_synthetic and not reconB:
+            counts=lambda result: _reconstruction_counts(result))
+        if not reconB:
             from ..geom.colmap_adapter import COLMAPUnavailable
             raise COLMAPUnavailable("COLMAP synthetic fallback disabled and no real reconstruction was produced")
     else:
@@ -552,16 +525,13 @@ def run_pipeline(
                 use_gpu=colmap_use_gpu,
                 workspace_root=out_path / "cache" / "colmap",
                 imagery_root=imagery_root_path,
-                allow_synthetic=allow_synthetic,
-                progress=progress_enabled,
-            ),
+                                progress=progress_enabled),
             inputs={
                 "workspace_root": str(out_path / "cache" / "colmap"),
                 "threads": colmap_threads,
                 "use_gpu": colmap_use_gpu,
             },
-            counts=lambda result: _reconstruction_counts(result),
-        )
+            counts=lambda result: _reconstruction_counts(result))
     timings["colmap_s"] = time.perf_counter() - t0
     t0 = time.perf_counter()
     t0 = time.perf_counter()
@@ -572,10 +542,8 @@ def run_pipeline(
             lambda: run_dim(
                 seqs,
                 imagery_root=imagery_root_path,
-                progress=progress_enabled,
-            ),
-            counts=lambda result: _reconstruction_counts(result),
-        )
+                progress=progress_enabled),
+            counts=lambda result: _reconstruction_counts(result))
     else:
         vo = _run_stage(
             run_state,
@@ -584,12 +552,9 @@ def run_pipeline(
                 seqs,
                 imagery_root=imagery_root_path,
                 min_inliers=vo_min_inliers,
-                allow_synthetic=allow_synthetic,
-                progress=progress_enabled,
-            ),
+                                progress=progress_enabled),
             inputs={"min_inliers": vo_min_inliers},
-            counts=lambda result: _reconstruction_counts(result),
-        )
+            counts=lambda result: _reconstruction_counts(result))
     timings["vo_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -599,14 +564,12 @@ def run_pipeline(
         lambda: (
             lambda found_anchors: (
                 found_anchors,
-                *solve_scale_and_h(reconA, reconB, vo, found_anchors, seqs),
-            )
-        )(find_anchors(seqs, token=token, allow_synthetic=allow_synthetic)),
+                *solve_scale_and_h(reconA, reconB, vo, found_anchors, seqs))
+        )(find_anchors(seqs, token=token)),
         counts=lambda result: {
             "anchors": len(result[0]) if result[0] is not None else 0,
             "scales": len(result[1]) if result[1] is not None else 0,
-        },
-    )
+        })
     timings["scale_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -617,17 +580,13 @@ def run_pipeline(
             seqs,
             out_dir=depth_cache_dir,
             imagery_root=imagery_root_path,
-            allow_synthetic=allow_synthetic,
-            progress=progress_enabled,
-        ),
+                        progress=progress_enabled),
         inputs={
             "cache_dir": str(depth_cache_dir),
-            "allow_synthetic": allow_synthetic,
-            "resume": resume,
+                        "resume": resume,
         },
         outputs=lambda result: {"cache_dir": str(depth_cache_dir)},
-        counts=lambda result: _depth_cache_counts(seqs, depth_cache_dir, strict=not allow_synthetic),
-    )
+        counts=lambda result: _depth_cache_counts(seqs, depth_cache_dir, strict=True))
     timings["depth_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -646,19 +605,16 @@ def run_pipeline(
                 mono_cache=depth_cache_dir,
                 vo_recon=vo,
                 imagery_root=imagery_root_path,
-                include_plane_sweep=allow_synthetic if name != "vo" else False,
-                allow_synthetic_depth=allow_synthetic,
-                mono_depths=mono_depths if options["include_monodepth"] else None,
-                **options,
-            )
+                include_plane_sweep=False,
+                                mono_depths=mono_depths if options["include_monodepth"] else None,
+                **options)
         return extracted
 
     extracted_points = _run_stage(
         run_state,
         "ground_extract",
         _extract_ground,
-        counts=lambda result: {name: len(points) for name, points in result.items()},
-    )
+        counts=lambda result: {name: len(points) for name, points in result.items()})
     ptsA = extracted_points.get("opensfm", [])
     ptsB = extracted_points.get("colmap", [])
     ptsC = extracted_points.get("vo", [])
@@ -669,8 +625,7 @@ def run_pipeline(
         try:
             from ..ml.integration import (
                 load_or_train_calibrator,
-                apply_learned_uncertainty,
-            )
+                apply_learned_uncertainty)
 
             model_path = Path(
                 uncertainty_model_path or (Path(out_dir) / "uncertainty_model.pkl")
@@ -721,8 +676,7 @@ def run_pipeline(
                 curbs=curb_lines,
                 camera_poses=camera_poses,
                 camera_models=camera_models,
-                consensus_points=consensus,
-            )
+                consensus_points=consensus)
             breakline_stats["breaklines_3d"] = len(breaklines_3d)
             log.info("Projected %d curb detections to 3D", len(breaklines_3d))
 
@@ -742,8 +696,7 @@ def run_pipeline(
                 log.info(
                     "Densified breaklines: %d vertices, %d edges",
                     len(breakline_vertices),
-                    len(breakline_edges),
-                )
+                    len(breakline_edges))
 
         except Exception as exc:
             log.warning("Breakline processing failed: %s", exc)
@@ -766,8 +719,7 @@ def run_pipeline(
                 tin_model = build_constrained_tin(
                     points=consensus,
                     breakline_vertices=breakline_vertices,
-                    breakline_edges=breakline_edges,
-                )
+                    breakline_edges=breakline_edges)
             else:
                 tin_model = build_tin(consensus)
 
@@ -776,8 +728,7 @@ def run_pipeline(
                 corridor_info,
                 grid_res=constants.GRID_RES_M,
                 max_extrapolation_m=constants.MAX_TIN_EXTRAPOLATION_M,
-                tin=tin_model,
-            )
+                tin=tin_model)
     except Exception as exc:  # pragma: no cover - corridor is best-effort
         log.warning("Corridor/TIN expansion failed: %s", exc)
 
@@ -792,8 +743,7 @@ def run_pipeline(
             "exported_candidates": len(consensus_all),
             "breakline_vertices": int(breakline_stats.get("vertices", 0)),
             "breakline_edges": int(breakline_stats.get("edges", 0)),
-        },
-    )
+        })
     timings["consensus_breaklines_tin_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -834,8 +784,7 @@ def run_pipeline(
         write_all_camera_positions_geojson(
             {"opensfm": reconA, "colmap": reconB, "vo": vo},
             lon0, lat0, h0,
-            camera_positions_geojson_path,
-        )
+            camera_positions_geojson_path)
     except Exception as exc:
         log.warning("Failed to write camera positions GeoJSON: %s", exc)
         run_warnings.append(f"camera_positions GeoJSON write failed: {exc}")
@@ -852,8 +801,7 @@ def run_pipeline(
         counts={
             "dtm_shape": list(dtm_s.shape),
             "ground_points": int(laz_points.shape[0]),
-        },
-    )
+        })
     timings["fusion_writers_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
@@ -866,8 +814,7 @@ def run_pipeline(
             geotiff_paths[dtm_key],
             str(qa_reference),
             out_dir=qa_dir,
-            reference_nodata_values=_parse_float_list(reference_nodata_values),
-        )
+            reference_nodata_values=_parse_float_list(reference_nodata_values))
     elif reference_dtm:
         raise FileNotFoundError(f"Reference DTM not found: {reference_dtm}")
     else:
@@ -878,8 +825,7 @@ def run_pipeline(
         "bbox": bbox,
         "dataset": _dataset_manifest(dataset_path),
         "synthetic_policy": {
-            "allow_synthetic": allow_synthetic,
-            "strict_production": strict_production,
+                        "strict_production": strict_production,
         },
         "provenance": {
             "git_sha": _git_sha(),
@@ -985,8 +931,7 @@ def run_pipeline(
             "report": str(out_path / "report.html"),
         },
         counts={"qa_status": qa_status, "external_n": external_stats.get("n") if external_stats else 0},
-        warnings=run_warnings,
-    )
+        warnings=run_warnings)
     timings["external_qa_report_s"] = time.perf_counter() - t0
     return manifest
 
@@ -1005,43 +950,35 @@ if typer is not None:
     def cli_run(
         aoi_bbox_arg: Optional[str] = typer.Argument(
             None,
-            help="Optional bbox as lon_min,lat_min,lon_max,lat_max. Prefer --aoi-bbox for scripts.",
-        ),
+            help="Optional bbox as lon_min,lat_min,lon_max,lat_max. Prefer --aoi-bbox for scripts."),
         aoi_bbox: Optional[str] = typer.Option(
             None,
             "--aoi-bbox",
-            help="Area of interest as lon_min,lat_min,lon_max,lat_max.",
-        ),
+            help="Area of interest as lon_min,lat_min,lon_max,lat_max."),
         out_dir: str = "./out",
         token: Optional[str] = None,
         dataset_dir: Optional[str] = typer.Option(
             None,
             "--dataset-dir",
-            help="Local dataset bundle root containing config.json, sequences, and imagery.",
-        ),
+            help="Local dataset bundle root containing config.json, sequences, and imagery."),
         imagery_root: Optional[str] = typer.Option(
             None,
             "--imagery-root",
-            help="Cached imagery root laid out as <root>/<sequence>/<image>.jpg.",
-        ),
+            help="Cached imagery root laid out as <root>/<sequence>/<image>.jpg."),
         reference_dtm: Optional[str] = typer.Option(
             None,
             "--reference-dtm",
-            help="Held-out reference DTM GeoTIFF for external QA.",
-        ),
+            help="Held-out reference DTM GeoTIFF for external QA."),
         reference_nodata_values: Optional[str] = typer.Option(
             None,
             "--reference-nodata-values",
-            help="Comma-separated reference values to treat as nodata for external QA.",
-        ),
+            help="Comma-separated reference values to treat as nodata for external QA."),
         allow_synthetic: bool = typer.Option(
             False,
-            help="Permit synthetic/heuristic fallbacks for development or smoke tests.",
-        ),
+            help="Permit synthetic/heuristic fallbacks for development or smoke tests."),
         strict_production: bool = typer.Option(
             True,
-            help="Fail when production prerequisites are missing.",
-        ),
+            help="Fail when production prerequisites are missing."),
         use_learned_uncertainty: bool = False,
         uncertainty_model_path: Optional[str] = None,
         enforce_breaklines: bool = False,
@@ -1049,36 +986,28 @@ if typer is not None:
         imagery_per_sequence: int = 5,
         colmap_threads: int = typer.Option(
             constants.COLMAP_DEFAULT_THREADS,
-            help="Thread budget for COLMAP feature extraction / reconstruction.",
-        ),
+            help="Thread budget for COLMAP feature extraction / reconstruction."),
         colmap_use_gpu: bool = typer.Option(
             constants.COLMAP_USE_GPU,
-            help="Enable COLMAP GPU paths (requires CUDA-enabled build).",
-        ),
+            help="Enable COLMAP GPU paths (requires CUDA-enabled build)."),
         legacy_vo: bool = typer.Option(
             False,
-            help="Use the legacy OpenCV ORB VO pipeline instead of Deep-Image-Matching.",
-        ),
+            help="Use the legacy OpenCV ORB VO pipeline instead of Deep-Image-Matching."),
         vo_min_inliers: Optional[int] = typer.Option(
             None,
-            help="Minimum VO inliers required per frame pair (default: constants.VO_MIN_INLIERS).",
-        ),
+            help="Minimum VO inliers required per frame pair (default: constants.VO_MIN_INLIERS)."),
         resume: bool = typer.Option(
             True,
             "--resume/--no-resume",
-            help="Reuse completed stage artifacts and maintain run_state.json.",
-        ),
+            help="Reuse completed stage artifacts and maintain run_state.json."),
         force_stage: Optional[list[str]] = typer.Option(
             None,
             "--force-stage",
-            help=f"Invalidate a stage and downstream stages. Choices: {', '.join(RUN_STAGES)}.",
-        ),
+            help=f"Invalidate a stage and downstream stages. Choices: {', '.join(RUN_STAGES)}."),
         progress: Optional[bool] = typer.Option(
             None,
             "--progress/--no-progress",
-            help="Show tqdm progress bars. Defaults to interactive stderr only.",
-        ),
-    ) -> None:
+            help="Show tqdm progress bars. Defaults to interactive stderr only.")) -> None:
         """Run the DTM generation pipeline.
 
         Parameters
@@ -1114,8 +1043,7 @@ if typer is not None:
             imagery_root=imagery_root,
             reference_dtm=reference_dtm,
             reference_nodata_values=reference_nodata_values,
-            allow_synthetic=allow_synthetic,
-            strict_production=strict_production,
+                        strict_production=strict_production,
             use_learned_uncertainty=use_learned_uncertainty,
             uncertainty_model_path=uncertainty_model_path,
             enforce_breaklines=enforce_breaklines,
@@ -1127,8 +1055,7 @@ if typer is not None:
             vo_min_inliers=vo_min_inliers,
             resume=resume,
             force_stage=force_stage,
-            progress=progress,
-        )
+            progress=progress)
 
 else:  # pragma: no cover - only executed when typer missing
     app = None
@@ -1152,15 +1079,13 @@ def _resolve_bbox(aoi_bbox: Optional[str], dataset_dir: Optional[Path]) -> tuple
                     float(bbox["min_lon"]),
                     float(bbox["min_lat"]),
                     float(bbox["max_lon"]),
-                    float(bbox["max_lat"]),
-                )
+                    float(bbox["max_lat"]))
     bbox = constants.bbox
     return (
         float(bbox["min_lon"]),
         float(bbox["min_lat"]),
         float(bbox["max_lon"]),
-        float(bbox["max_lat"]),
-    )
+        float(bbox["max_lat"]))
 
 
 def _resolve_imagery_root(dataset_dir: Optional[Path], imagery_root: Optional[str]) -> Optional[Path]:
@@ -1204,9 +1129,7 @@ def _run_inputs_fingerprint(
     dataset_dir: Optional[Path],
     imagery_root: Optional[Path],
     reference_dtm: Optional[str],
-    strict_production: bool,
-    allow_synthetic: bool,
-) -> str:
+    strict_production: bool) -> str:
     frames = [
         {
             "seq_id": frame.seq_id,
@@ -1224,8 +1147,7 @@ def _run_inputs_fingerprint(
         "imagery_root": str(imagery_root) if imagery_root else None,
         "reference_dtm": str(reference_dtm) if reference_dtm else None,
         "strict_production": strict_production,
-        "allow_synthetic": allow_synthetic,
-        "frames": frames,
+                "frames": frames,
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default)
     return hashlib.sha256(raw.encode("utf8")).hexdigest()
@@ -1239,26 +1161,22 @@ def _mask_cache_counts(
     seqs: dict[str, list[FrameMeta]],
     cache_dir: Path,
     *,
-    strict: bool,
-) -> dict[str, object]:
+    strict: bool) -> dict[str, object]:
     return _npz_cache_counts(
         _expected_cache_paths(seqs, cache_dir),
-        required_keys=("prob",),
-        strict=strict,
-    )
+        required_keys=("prob"),
+        strict=strict)
 
 
 def _depth_cache_counts(
     seqs: dict[str, list[FrameMeta]],
     cache_dir: Path,
     *,
-    strict: bool,
-) -> dict[str, object]:
+    strict: bool) -> dict[str, object]:
     return _npz_cache_counts(
         _expected_cache_paths(seqs, cache_dir),
         required_keys=("depth", "uncertainty"),
-        strict=strict,
-    )
+        strict=strict)
 
 
 def _validate_mask_cache(seqs: dict[str, list[FrameMeta]], cache_dir: Path, *, strict: bool) -> bool:
@@ -1275,8 +1193,7 @@ def _npz_cache_counts(
     paths: list[Path],
     *,
     required_keys: tuple[str, ...],
-    strict: bool,
-) -> dict[str, object]:
+    strict: bool) -> dict[str, object]:
     present = 0
     valid = 0
     invalid: list[str] = []
@@ -1350,8 +1267,7 @@ def _strict_preflight(
     seqs: dict[str, list[FrameMeta]],
     *,
     imagery_root_path: Optional[Path],
-    reference_dtm: Optional[str],
-) -> dict[str, object]:
+    reference_dtm: Optional[str]) -> dict[str, object]:
     checks: list[dict[str, object]] = []
 
     def add(name: str, ok: bool, message: str) -> None:
@@ -1367,8 +1283,7 @@ def _strict_preflight(
         not forced_envs,
         "no forced synthetic flags set"
         if not forced_envs
-        else f"forced synthetic flags present: {forced_envs}",
-    )
+        else f"forced synthetic flags present: {forced_envs}")
 
     if imagery_root_path is None or not imagery_root_path.exists():
         add("imagery root", False, f"imagery root missing: {imagery_root_path}")
@@ -1381,8 +1296,7 @@ def _strict_preflight(
             missing == 0 and not readable_errors,
             f"{len(image_paths) - missing}/{len(image_paths)} images found; readable sample ok"
             if missing == 0 and not readable_errors
-            else f"missing={missing}, unreadable_sample={readable_errors[:5]}",
-        )
+            else f"missing={missing}, unreadable_sample={readable_errors[:5]}")
 
     if reference_dtm:
         ref_path = Path(reference_dtm)
@@ -1395,8 +1309,7 @@ def _strict_preflight(
         colmap_ok,
         f"binary {colmap_bin} or Docker image available"
         if colmap_ok
-        else "COLMAP binary missing and COLMAP_DOCKER_IMAGE unavailable",
-    )
+        else "COLMAP binary missing and COLMAP_DOCKER_IMAGE unavailable")
 
     opensfm_bin = os.getenv("OPEN_SFM_BIN") or "opensfm_run_all"
     opensfm_image = os.getenv("OPEN_SFM_DOCKER_IMAGE", "freakthemighty/opensfm:latest")
@@ -1406,8 +1319,7 @@ def _strict_preflight(
         opensfm_ok,
         f"binary {opensfm_bin} or Docker image {opensfm_image} available"
         if opensfm_ok
-        else f"OpenSfM binary missing and Docker image {opensfm_image} unavailable",
-    )
+        else f"OpenSfM binary missing and Docker image {opensfm_image} unavailable")
 
     ground_model_path = os.getenv("GROUND_MASK_MODEL_PATH")
     ground_model_ok = bool(ground_model_path and Path(ground_model_path).exists()) or _hf_model_cached(
@@ -1418,8 +1330,7 @@ def _strict_preflight(
         ground_model_ok,
         "TorchScript path or cached Hugging Face model available"
         if ground_model_ok
-        else "missing GROUND_MASK_MODEL_PATH and cached SegFormer ground model",
-    )
+        else "missing GROUND_MASK_MODEL_PATH and cached SegFormer ground model")
 
     depth_model_path = os.getenv("MONODEPTH_MODEL_PATH")
     depth_model_ok = bool(depth_model_path and Path(depth_model_path).exists()) or _hf_model_cached(
@@ -1430,8 +1341,7 @@ def _strict_preflight(
         depth_model_ok,
         "TorchScript path or cached Hugging Face model available"
         if depth_model_ok
-        else "missing MONODEPTH_MODEL_PATH and cached Depth Anything model",
-    )
+        else "missing MONODEPTH_MODEL_PATH and cached Depth Anything model")
 
     errors = [check for check in checks if not check["ok"]]
     result = {"status": "pass" if not errors else "fail", "checks": checks}
@@ -1455,8 +1365,7 @@ def _docker_image_available(image: str | None) -> bool:
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            timeout=10,
-        )
+            timeout=10)
         return True
     except Exception:
         return False
@@ -1474,8 +1383,7 @@ def _hf_model_cached(model_id: str | None) -> bool:
             model_id,
             "config.json",
             cache_dir=os.getenv("DTM_MODEL_CACHE_DIR", "models/huggingface"),
-            revision=os.getenv("DTM_MODEL_REVISION"),
-        )
+            revision=os.getenv("DTM_MODEL_REVISION"))
     except Exception:
         return False
     if path is None or not isinstance(path, (str, os.PathLike)):
@@ -1514,8 +1422,7 @@ def _sample_readable_errors(paths: list[Path], *, limit: int = 30) -> list[str]:
 
 def _load_dataset_sequences(
     dataset_dir: Path,
-    bbox: tuple[float, float, float, float],
-) -> dict[str, list[FrameMeta]]:
+    bbox: tuple[float, float, float, float]) -> dict[str, list[FrameMeta]]:
     metadata_path = dataset_dir / "sequences" / "metadata.geojson"
     if not metadata_path.exists():
         raise FileNotFoundError(f"Dataset metadata not found: {metadata_path}")
@@ -1557,8 +1464,7 @@ def _load_dataset_sequences(
             camera_type=str(getattr(row, "camera_type", "unknown") or "unknown").lower(),
             cam_params=cam_params,
             quality_score=_safe_float(getattr(row, "quality_score", None)),
-            thumbnail_url=getattr(row, "thumb_original_url", None),
-        )
+            thumbnail_url=getattr(row, "thumb_original_url", None))
         sequences.setdefault(frame.seq_id, []).append(frame)
 
     for frames in sequences.values():
@@ -1581,8 +1487,7 @@ def _dataset_kept_sequence_ids(dataset_dir: Path) -> set[str]:
 
 
 def _camera_pose_and_model_dicts(
-    recon: dict[str, ReconstructionResult],
-) -> tuple[dict[str, dict[str, object]], dict[str, dict[str, object]]]:
+    recon: dict[str, ReconstructionResult]) -> tuple[dict[str, dict[str, object]], dict[str, dict[str, object]]]:
     poses: dict[str, dict[str, object]] = {}
     models: dict[str, dict[str, object]] = {}
     for result in recon.values():
@@ -1615,8 +1520,7 @@ def _grid_transform_webmercator(
     grid: GridSpec,
     *,
     lon0: float,
-    lat0: float,
-) -> tuple[object, str]:
+    lat0: float) -> tuple[object, str]:
     from affine import Affine
     from pyproj import Transformer
 
@@ -1633,8 +1537,7 @@ def _points_and_attrs_from_consensus(points: list[dict[str, object]]) -> tuple[n
         return np.zeros((0, 3), dtype=np.float32), None
     xyz = np.asarray(
         [[float(p["x"]), float(p["y"]), float(p["z"])] for p in points],
-        dtype=np.float32,
-    )
+        dtype=np.float32)
     attrs = {
         "support": np.asarray([int(p.get("support", 0)) for p in points], dtype=np.int32),
         "sem_prob": np.asarray([float(p.get("sem_prob", np.nan)) for p in points], dtype=np.float32),
@@ -1645,8 +1548,7 @@ def _points_and_attrs_from_consensus(points: list[dict[str, object]]) -> tuple[n
 
 def _source_dtms_on_grid(
     sources: dict[str, list[GroundPoint]],
-    grid: GridSpec,
-) -> dict[str, np.ndarray]:
+    grid: GridSpec) -> dict[str, np.ndarray]:
     results: dict[str, np.ndarray] = {}
     for name, points in sources.items():
         arr = np.full((grid.height, grid.width), np.nan, dtype=np.float32)
@@ -1698,8 +1600,7 @@ def _git_sha() -> str | None:
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            text=True,
-        )
+            text=True)
     except Exception:
         return None
     return result.stdout.strip() or None

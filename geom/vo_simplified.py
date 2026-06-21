@@ -11,7 +11,6 @@ import numpy as np
 from .. import constants
 from ..common_core import FrameMeta, Pose, ReconstructionResult
 from ..ingest.image_loader import ImageryLoader
-from .utils import heading_matrix, positions_from_frames
 
 try:  # Optional dependency for real VO pipeline
     import cv2  # type: ignore
@@ -33,8 +32,7 @@ def run(
     Estimate relative trajectories per sequence using visual odometry.
 
     When OpenCV and cached imagery are available, an ORB + Essential-matrix
-    pipeline is used to recover relative motion. Otherwise the routine falls
-    back to the deterministic synthetic path used by earlier milestones.
+    pipeline is used to recover relative motion.
     """
 
     if not seqs:
@@ -60,7 +58,6 @@ def run(
             frames,
             loader,
             min_inliers=min_inliers,
-            allow_synthetic_steps=False,
         )
         if track is None:
             raise RuntimeError(f"VO failed for {seq_id}")
@@ -86,7 +83,6 @@ def _run_opencv_sequence(
     loader: ImageryLoader,
     *,
     min_inliers: int,
-    allow_synthetic_steps: bool,
 ) -> Optional[ReconstructionResult]:
     images: List[tuple[FrameMeta, np.ndarray]] = []
     for frame in frames:
@@ -125,32 +121,14 @@ def _run_opencv_sequence(
         frame_b, img_b = images[idx + 1]
         K = _camera_matrix(frame_a)
         if K is None:
-            log.debug("VO missing intrinsics for %s; falling back to synthetic step", frame_a.image_id)
-            if not allow_synthetic_steps:
-                return None
-            delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
-            current_center = current_center + delta_center
-            step_lengths.append(float(np.linalg.norm(delta_center)))
-            total_pairs += 1
-            poses[frame_b.image_id] = Pose(R=current_R.copy(), t=current_center.copy())
-            centers[frame_b.image_id] = current_center.copy()
-            orientations[frame_b.image_id] = current_R.copy()
-            continue
+            log.debug("VO missing intrinsics for %s", frame_a.image_id)
+            return None
 
         kp1, des1 = orb.detectAndCompute(img_a, None)
         kp2, des2 = orb.detectAndCompute(img_b, None)
         if des1 is None or des2 is None or len(kp1) < 8 or len(kp2) < 8:
             log.debug("VO insufficient keypoints between %s and %s", frame_a.image_id, frame_b.image_id)
-            if not allow_synthetic_steps:
-                return None
-            delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
-            current_center = current_center + delta_center
-            step_lengths.append(float(np.linalg.norm(delta_center)))
-            total_pairs += 1
-            poses[frame_b.image_id] = Pose(R=current_R.copy(), t=current_center.copy())
-            centers[frame_b.image_id] = current_center.copy()
-            orientations[frame_b.image_id] = current_R.copy()
-            continue
+            return None
 
         if constants.VO_USE_RATIO_TEST:
             matches_knn = bf.knnMatch(des1, des2, k=2)
@@ -163,16 +141,7 @@ def _run_opencv_sequence(
 
         if len(matches) < min_inliers:
             log.debug("VO match count below threshold (%d < %d) between %s and %s", len(matches), min_inliers, frame_a.image_id, frame_b.image_id)
-            if not allow_synthetic_steps:
-                return None
-            delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
-            current_center = current_center + delta_center
-            step_lengths.append(float(np.linalg.norm(delta_center)))
-            total_pairs += 1
-            poses[frame_b.image_id] = Pose(R=current_R.copy(), t=current_center.copy())
-            centers[frame_b.image_id] = current_center.copy()
-            orientations[frame_b.image_id] = current_R.copy()
-            continue
+            return None
 
         pts1 = np.float32([kp1[m.queryIdx].pt for m in matches])
         pts2 = np.float32([kp2[m.trainIdx].pt for m in matches])
@@ -187,31 +156,13 @@ def _run_opencv_sequence(
         )
         if E is None or E.size == 0:
             log.debug("VO essential matrix failed between %s and %s", frame_a.image_id, frame_b.image_id)
-            if not allow_synthetic_steps:
-                return None
-            delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
-            current_center = current_center + delta_center
-            step_lengths.append(float(np.linalg.norm(delta_center)))
-            total_pairs += 1
-            poses[frame_b.image_id] = Pose(R=current_R.copy(), t=current_center.copy())
-            centers[frame_b.image_id] = current_center.copy()
-            orientations[frame_b.image_id] = current_R.copy()
-            continue
+            return None
 
         _, R_rel, t_rel, mask_pose = cv2.recoverPose(E, pts1, pts2, K)
         inliers = int(mask_pose.sum()) if mask_pose is not None else 0
         if inliers < min_inliers:
             log.debug("VO recoverPose inliers below threshold (%d < %d)", inliers, min_inliers)
-            if not allow_synthetic_steps:
-                return None
-            delta_center, current_R = _synthetic_step(current_center, current_R, frame_a, frame_b)
-            current_center = current_center + delta_center
-            step_lengths.append(float(np.linalg.norm(delta_center)))
-            total_pairs += 1
-            poses[frame_b.image_id] = Pose(R=current_R.copy(), t=current_center.copy())
-            centers[frame_b.image_id] = current_center.copy()
-            orientations[frame_b.image_id] = current_R.copy()
-            continue
+            return None
 
         delta_center = _propagate_delta(current_R, t_rel)
         current_center = current_center + delta_center
@@ -263,21 +214,6 @@ def _propagate_delta(R_world: np.ndarray, t_rel: np.ndarray) -> np.ndarray:
     return delta
 
 
-def _synthetic_step(
-    current_center: np.ndarray,
-    current_R: np.ndarray,
-    frame_a: FrameMeta,
-    frame_b: FrameMeta,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Fallback when real VO fails for a frame pair."""
-    del frame_a, frame_b  # parameters kept for signature clarity
-    positions = np.vstack([current_center, current_center + np.array([1.0, 0.0, 0.0], dtype=np.float64)])
-    baseline = heading_matrix(positions, 0)
-    delta = np.array([1.0, 0.0, 0.0], dtype=np.float64)
-    R_next = baseline @ current_R
-    return delta, R_next
-
-
 def _camera_matrix(frame: FrameMeta) -> Optional[np.ndarray]:
     params = frame.cam_params or {}
     width = float(params.get("width") or params.get("image_width") or 2048.0)
@@ -312,52 +248,3 @@ def _camera_matrix(frame: FrameMeta) -> Optional[np.ndarray]:
     if not np.isfinite(matrix).all():
         return None
     return matrix
-
-
-def _run_synthetic(
-    seqs: Mapping[str, List[FrameMeta]],
-    rng_seed: int,
-) -> Dict[str, ReconstructionResult]:
-    rng = np.random.default_rng(rng_seed)
-    results: Dict[str, ReconstructionResult] = {}
-
-    for seq_id, frames in seqs.items():
-        if not frames:
-            continue
-
-        positions, _ = positions_from_frames(frames)
-        if positions.size == 0:
-            continue
-
-        positions -= positions[0]
-        step_norms = (
-            np.linalg.norm(np.diff(positions, axis=0), axis=1)
-            if positions.shape[0] > 1
-            else np.array([1.0])
-        )
-        scale = float(np.mean(step_norms)) if step_norms.size else 1.0
-        if scale <= 1e-6:
-            scale = 1.0
-        rel_positions = positions / scale
-
-        poses = {}
-        for idx, frame in enumerate(frames):
-            pos = rel_positions[idx] + rng.normal(scale=0.01, size=3)
-            R = heading_matrix(rel_positions, idx)
-            poses[frame.image_id] = Pose(R=R, t=pos)
-
-        results[seq_id] = ReconstructionResult(
-            seq_id=seq_id,
-            frames=list(frames),
-            poses=poses,
-            points_xyz=np.zeros((0, 3), dtype=np.float32),
-            source="vo",
-            metadata={
-                "scale": scale,
-                "rng_seed": rng_seed,
-                "mode": "synthetic",
-                "source_type": "synthetic",
-            },
-        )
-
-    return results

@@ -1,0 +1,50 @@
+{
+    "general": {
+        "quality": "HIGH",
+        "tile_selection": "NONE",
+        "tile_size": [
+            2400,
+            2000
+        ],
+        "tile_overlap": 10,
+        "tile_preselection_size": 2000,
+        "min_matches_per_tile": 10,
+        "geometric_verification_per_tile": false,
+        "gv_threshold_in_tiles_matching": 4,
+        "geom_verification": "MAGSAC",
+        "gv_threshold": 4,
+        "gv_confidence": 0.99999,
+        "min_inliers_per_pair": 15,
+        "min_inlier_ratio_per_pair": 0.15,
+        "try_match_full_images": false,
+        "preselection_pipeline": "superpoint+lightglue",
+        "image_dir": "/home/kaue/mapillary_dtm/qa/data/sample_dataset/geometry/colmap/l27kwlcx3fjh7t6w9ccvic_images",
+        "output_dir": "/home/kaue/mapillary_dtm/qa/data/sample_dataset/geometry/colmap/l27kwlcx3fjh7t6w9ccvic",
+        "matching_strategy": "sequential",
+        "retrieval": null,
+        "pair_file": "/home/kaue/mapillary_dtm/qa/data/sample_dataset/geometry/colmap/l27kwlcx3fjh7t6w9ccvic/pairs.txt",
+        "overlap": 10,
+        "db_path": null,
+        "upright": false,
+        "verbose": false,
+        "graph": true,
+        "skip_reconstruction": false,
+        "openmvg_conf": null,
+        "camera_options": null
+    },
+    "extractor": {
+        "name": "superpoint",
+        "nms_radius": 3,
+        "keypoint_threshold": 0.0005,
+        "max_keypoints": 2048
+    },
+    "matcher": {
+        "name": "lightglue",
+        "n_layers": 9,
+        "mp": false,
+        "flash": true,
+        "depth_confidence": 0.95,
+        "width_confidence": 0.99,
+        "filter_threshold": 0.1
+    }
+}

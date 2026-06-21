@@ -1,0 +1,13 @@
+{
+  "source": "dtm_from_mapillary",
+  "config": {
+    "matching_gps_distance": 80.0,
+    "matching_gps_neighbors": 8,
+    "matching_time_neighbors": 8,
+    "processes": 4,
+    "feature_process_size": 2048,
+    "bundle_interval": 10,
+    "bundle_new_points_ratio": 2.0,
+    "use_altitude_tag": "yes"
+  }
+}

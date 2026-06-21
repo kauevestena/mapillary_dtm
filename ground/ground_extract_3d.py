@@ -40,8 +40,7 @@ def label_and_filter_points(
     include_plane_sweep: bool = True,
     vo_recon: Mapping[str, ReconstructionResult] | None = None,
     imagery_root: Path | str | None = None,
-    allow_synthetic_depth: bool = True,
-    mono_depths: CacheResult | None = None,
+        mono_depths: CacheResult | None = None,
 ) -> List[GroundPoint]:
     """Return ground-only point samples enriched with QA metadata."""
 
@@ -56,8 +55,7 @@ def label_and_filter_points(
             frame_index,
             out_dir=mono_cache,
             imagery_root=imagery_root,
-            allow_synthetic=allow_synthetic_depth,
-        )
+                    )
     elif not include_monodepth:
         mono_depths = {}
 

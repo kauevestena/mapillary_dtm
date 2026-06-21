@@ -1,19 +1,133 @@
 {
   "l27kwlcx3fjh7t6w9ccvic": [
     {
+      "image_id": "487967815974661",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347868720,
+      "lon": -48.594831899666,
+      "lat": -27.587340216216,
+      "altitude": 10.148803669725,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.88271379687678,
+        -1.157206089376,
+        1.4695032138125
+      ],
+      "quality_score": 0.745,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An83mQYn54srFUk5Pqv1STWMOJN24e6MXTFPSFmJWAdvLK6CilBSxlJwppRpVHnpM-AXyo24iorYU-fy_SCWqbF-2RSGIGPUPVHlekVG3dOY_UWDlFYLCn-6jvkhDguVqiMBVs2nYzHLwsD8TGLFRQ?edm=ALXxkZ8EAAAA&_nc_gid=0ZhSOHipGzAEJBJOs1zWJg&_nc_oc=AdpYDuZ_tW5HW7Mz3Gvz9idT0hBXPVsgZCWXyDFvv0IYl3sqqAnijJ3RThQLwILjGCk&ccb=10-5&oh=00_Af_G_ieRD3ms26wb89bR7sN90jZzbsn_PHhRODYPvgcCyQ&oe=6A5EAE6D&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/487967815974661_1024.jpg"
+    },
+    {
+      "image_id": "595114328129242",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347868907,
+      "lon": -48.594812263897,
+      "lat": -27.587344650109,
+      "altitude": 9.9777825688073,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.88124414969851,
+        -1.1542395166047,
+        1.4683814637844
+      ],
+      "quality_score": 0.749,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An_uiB5lJJwBzfevTaOP0_7GXC5jtZ5OJdnq36UHhKt2LRCDs2Qb-0le45Qa5PRDcYljx3gDW499ngOCszETmaUMWpeTBoIcdKEbKKcEGqfqVM50tgyewGxsDpWUbvWmLJcsfq9Qfza8oezRNP_rtQ?edm=ALXxkZ8EAAAA&_nc_gid=QY1gjYjQSUebQaFJU8WnNA&_nc_oc=Adq5eo4gNJ43cejhOFccjQxpuKaC3IKH_tCysidua3O9a4nVYYm6JcOoBu09Hkl_w0w&ccb=10-5&oh=00_Af9ynkfXOoJaF0ZFGcOJ-eJBVlwMxlQ0nSn5PnqvJ94BjA&oe=6A5EB778&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/595114328129242_1024.jpg"
+    },
+    {
+      "image_id": "468020011157631",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347869092,
+      "lon": -48.594792514753,
+      "lat": -27.587348663971,
+      "altitude": 9.7901500996016,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.88756296602349,
+        -1.1605223386149,
+        1.4631414090307
+      ],
+      "quality_score": 0.758,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An9rRXVDuTYXoILAERHUw9gHyMDeEWCp06qg0bBe-kCeE5uSJGSfD0e7IcuD_h7bKzVkuRNE51NSxYoP0Mn7ANqudaVG_vVfwA-roLub7_9CO5Cs6j6qvMjxPnichdyGVeuncSSb6bP-G-UosbPelQ?edm=ALXxkZ8EAAAA&_nc_gid=Tm-pdvxjAr24DGrbCPRlgg&_nc_oc=AdojCJScYFQYRntDdEB4ZAS6pN8tP2lJFVRD0GUoPGYTcebsxzjDK3wER25C_iySX0Q&ccb=10-5&oh=00_Af_DybOboEhF3VwABUWI5UR5kxuybMOK45OrRfRh1UUD3w&oe=6A5EB675&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/468020011157631_1024.jpg"
+    },
+    {
+      "image_id": "509059190130782",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347869276,
+      "lon": -48.594772679616,
+      "lat": -27.587352325843,
+      "altitude": 9.5887471115538,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.90333837377458,
+        -1.1650159638276,
+        1.4616976030495
+      ],
+      "quality_score": 0.752,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An_5k_My-aY14gjM0XOoHAVIdTUCx5jNvgBNtJDFU59YGBmKoLfH7Jcuw4hsCYKAmtViF7t2Ovrj6gLbXBAvotx7tHBFf5MPqi-xCzOXAeeKA-3X6XXPR6FlInK8aEcT-N9YlRkhMnZi75ua2j8wmA?edm=ALXxkZ8EAAAA&_nc_gid=LsIKoBJQvcCWXIChLjyglA&_nc_oc=AdrK2nCrfvCWQwatU9TSKRobapK_IXvaeGbwLBIilsE5yxXEyWOGvu6GMEJkZDIO_Go&ccb=10-6&oh=00_Af99rSjpTdD-3lvbY4LuaNO1mnpXyJ6JcSPlQQ95D3IhGA&oe=6A5EC4CB&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/509059190130782_1024.jpg"
+    },
+    {
       "image_id": "549798756007659",
       "seq_id": "l27kwlcx3fjh7t6w9ccvic",
       "captured_at_ms": 1562347869643,
       "lon": -48.594733009343,
       "lat": -27.587359649588,
+      "altitude": 9.1859411354582,
       "camera_type": "fisheye",
       "camera_parameters": [
-        0.0,
-        0.0,
-        0.0
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.92276324134237,
+        -1.1614099862637,
+        1.4674045564893
       ],
       "quality_score": 0.755,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An807lN4Tl5eTFOdVXxu8OXCVCk_ydB76EDx4te4UN_K7UpdnkCX7Xcc8kIuQXmRwmnBHEuRryneCYHvosae-w6H1jzzyioHIs6iCNv739NqJKyCv9tNo6O90X_gXibVa0f_Tnv2Xp-x3QMX3RZuVA?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdoY__liyuwQ8TXYWA6NRV6ZNcTcwshHlE29eWkD2uAdiHJY0UN5Z7XCYSrXxdv6nYw&ccb=10-5&oh=00_Af_itUiOBfIfazscQXAlIcsWnBcpkTt5pNCWHrcR6dra9Q&oe=6A5BA26E&_nc_sid=201bca",
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An807lN4Tl5eTFOdVXxu8OXCVCk_ydB76EDx4te4UN_K7UpdnkCX7Xcc8kIuQXmRwmnBHEuRryneCYHvosae-w6H1jzzyioHIs6iCNv739NqJKyCv9tNo6O90X_gXibVa0f_Tnv2Xp-x3QMX3RZuVA?edm=ALXxkZ8EAAAA&_nc_gid=NKRBe8z6bFutRcTHM85OWg&_nc_oc=AdoY__liyuwQ8TXYWA6NRV6ZNcTcwshHlE29eWkD2uAdiHJY0UN5Z7XCYSrXxdv6nYw&ccb=10-5&oh=00_Af_hogyRFOqo8T2BN_1kHCxW5D23aM8hUju_Rz53zIZWXw&oe=6A5EB5EE&_nc_sid=201bca",
       "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/549798756007659_1024.jpg"
     },
     {
@@ -22,14 +136,24 @@
       "captured_at_ms": 1562347869827,
       "lon": -48.594713174206,
       "lat": -27.587363311461,
+      "altitude": 8.9845381474104,
       "camera_type": "fisheye",
       "camera_parameters": [
-        0.0,
-        0.0,
-        0.0
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.92882971001928,
+        -1.152491195031,
+        1.4749000979398
       ],
       "quality_score": 0.75,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An-uHRPh7ubP92M9c4qrQpnEsJBQzckD23Qf48sINVibmVrTPZ60zjrvE3279oar-EK6M9WuazZGhm-JnIjNirycXkges_xwDNoP3R4ntAkC-3P7iCbZREI6vYjtK-vYUGWDJtCHhvXG1iQOiK5YGg?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdoLmzVYxcXNXckEJVVVkwqfGQoYzIcvOysvxRwzOKoHh0xKWh8z3PYvnR41V-zBnaA&ccb=10-6&oh=00_Af8SulcvUq0wwhDlmbl04cXKT-NEcN3FUe7tgCxlvnAGtQ&oe=6A5B8FD0&_nc_sid=201bca",
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An-uHRPh7ubP92M9c4qrQpnEsJBQzckD23Qf48sINVibmVrTPZ60zjrvE3279oar-EK6M9WuazZGhm-JnIjNirycXkges_xwDNoP3R4ntAkC-3P7iCbZREI6vYjtK-vYUGWDJtCHhvXG1iQOiK5YGg?edm=ALXxkZ8EAAAA&_nc_gid=m8m4pXOyBU2qoGCy_Me1rA&_nc_oc=AdpIraQvTDZgZAVriwKhwfbsJ1HAKgx7I7s9dQntI0Tz7jbSrJl_8W2wzFXTFXPx8eA&ccb=10-5&oh=00_Af_GETbOcTrT1GpJn3k3UGXFXNnd5lIrsiw1q9juGGZ3bg&oe=6A5EA350&_nc_sid=201bca",
       "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/177246630949005_1024.jpg"
     },
     {
@@ -38,14 +162,24 @@
       "captured_at_ms": 1562347870010,
       "lon": -48.594693340517,
       "lat": -27.587366979355,
+      "altitude": 8.7956709127382,
       "camera_type": "fisheye",
       "camera_parameters": [
-        0.0,
-        0.0,
-        0.0
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.91279131899198,
+        -1.1389162634321,
+        1.4786022370071
       ],
       "quality_score": 0.761,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An88FOnyWpZFkeWGMYMEP-Rh3OV1MTQSrnsRgvYnhiMLFwaapU0aidwnV-OHC-_H6XEQqEnkSdtEIq1IIkv7gNfGHZJ30PRgkNeORRuK7lBAF5AoTT2ET2s123kp082V8F_t-0PbUC68vQDgx4WaHg?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdqKIUAtb_5g4vUBGIuN-vXfPXMOneygUT69ZYRptTbcS9ctEdeu5uVW7-ZlVWH1G-w&ccb=10-5&oh=00_Af8pIt1kX_fguPY4O9TkeyQRep07vOBzbBqsAJFWeJbgTQ&oe=6A5BA2B3&_nc_sid=201bca",
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An88FOnyWpZFkeWGMYMEP-Rh3OV1MTQSrnsRgvYnhiMLFwaapU0aidwnV-OHC-_H6XEQqEnkSdtEIq1IIkv7gNfGHZJ30PRgkNeORRuK7lBAF5AoTT2ET2s123kp082V8F_t-0PbUC68vQDgx4WaHg?edm=ALXxkZ8EAAAA&_nc_gid=IHeaqtWNgU5w-Xqs6YkLLw&_nc_oc=Adq-0U8wAbv_R0bl5Uwb0pdLUlKfSb7k57LTqZ8WMdiLmI6Lh-JJi6T3V30dXZSxaF8&ccb=10-5&oh=00_Af9TjdSAiTNuk2_QtXtcLnIE045v3iwtSVkj3_7qYoPDHQ&oe=6A5EB633&_nc_sid=201bca",
       "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/170058561705143_1024.jpg"
     },
     {
@@ -54,15 +188,129 @@
       "captured_at_ms": 1562347870182,
       "lon": -48.594673522337,
       "lat": -27.587370713204,
+      "altitude": 8.7439713139418,
       "camera_type": "fisheye",
       "camera_parameters": [
-        0.0,
-        0.0,
-        0.0
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.91543091629682,
+        -1.1463368165747,
+        1.4710026394556
       ],
       "quality_score": 0.747,
-      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An9EN0YnGqgiroWNO9ykfKrUoA2KTH17QCZJF0x43XeJ3jKX19jbNY-Hvl-8cvUfy0ponJMT-5RY5LiyhQfifhV6-xDLGyhK4jRJtD1gxDRvPrbK1Ed-oUKZBt-bS-OY--yMYcgm3WzI-i2YVaxkyg?stp=s1024x576&edm=AOnQwmMEAAAA&_nc_gid=KSZcLXf1N9lpLU806uRCcw&_nc_oc=AdqnL_TREt9nGg5GdhNqxMHhjIaBazUQ_XBmH1fmgZTRXOBn1ANcoVCf4phhTiKVUp4&ccb=10-5&oh=00_Af_40ZMauR0E1fJbK1HVrU1R-1rGm58s__dqozN_ymJAIA&oe=6A5BB346&_nc_sid=201bca",
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An9EN0YnGqgiroWNO9ykfKrUoA2KTH17QCZJF0x43XeJ3jKX19jbNY-Hvl-8cvUfy0ponJMT-5RY5LiyhQfifhV6-xDLGyhK4jRJtD1gxDRvPrbK1Ed-oUKZBt-bS-OY--yMYcgm3WzI-i2YVaxkyg?edm=ALXxkZ8EAAAA&_nc_gid=44BTKOnKqv2OVFS9cJCMnQ&_nc_oc=Ado7bAjB8ctsSA-sLQAXqgxyPfE6WuMoeMNAX87_s5FxdQd4RzCFUZoiWRx2J5-JpqM&ccb=10-5&oh=00_Af9XNhvhucSkzYLHVwqC6SZnzVf8WPFLQTVRfJNC5P9nlQ&oe=6A5E8E86&_nc_sid=201bca",
       "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/530796564614344_1024.jpg"
+    },
+    {
+      "image_id": "291129559315209",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347870354,
+      "lon": -48.594653704042,
+      "lat": -27.587374447074,
+      "altitude": 8.6922714142427,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.92545155231928,
+        -1.1544354074973,
+        1.4653754517881
+      ],
+      "quality_score": 0.755,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An_irfERA_9OR3IS3NqubtMAZg5wmNFpnsfLdC2r7IwxDSkNr-Pvzunof_Y5LX7D8Qh-ti44SlovacmqB2Zd6tp-diloZZvbMUk_Qk1aCVOgsRhIx5Oeu-lN3XlOwkVTRc-Pr1_OdV188hOGIBa1qA?edm=ALXxkZ8EAAAA&_nc_gid=AE03C8E856395eeKrlO41g&_nc_oc=AdpzKEhK1iYdpeTHNCRnN7-nCqBkqbfTyD2q1N7vAoaxhIuaB9pumZYxqqqu03ZcyOI&ccb=10-5&oh=00_Af-ZWA3nSm6CBQBF-QkgshgwVYsqQHVW0xy_5kWNe_vMSw&oe=6A5EA16E&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/291129559315209_1024.jpg"
+    },
+    {
+      "image_id": "1197003347412468",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347870525,
+      "lon": -48.594633885747,
+      "lat": -27.587378180944,
+      "altitude": 8.6405715145436,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.92751758953519,
+        -1.1442091522306,
+        1.4721246324517
+      ],
+      "quality_score": 0.759,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An97fupL0ExjeW48gG4GxlCTQiuguOUuEHZst8DmXzSqMyykVAv-qzgeTjpcf5CFdPjXnVzxzD9ptPL96zYb1pUzJ-M9MjO9D6BGdGZcexlydyJ2R8v6sp_DbyKpElxTcSRUeyTdj-di53T3wsm3fQ?edm=ALXxkZ8EAAAA&_nc_gid=BZwBgSziI-nYOrKilKn0yA&_nc_oc=AdoyBU9QwMwm9JvX1hP_QvOZ5QGohIJwzwmghax9aGvRQwIRV2JO4AVr--bo0y2XJvA&ccb=10-5&oh=00_Af---yvjUVV1dOOY4n8RqqnZa2YmaNhuwX1_M3nOiWP9gw&oe=6A5EB8DC&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/1197003347412468_1024.jpg"
+    },
+    {
+      "image_id": "3701671393289068",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347870697,
+      "lon": -48.594614067568,
+      "lat": -27.587381914792,
+      "altitude": 8.5888719157472,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.93051427008,
+        -1.1392960255635,
+        1.4740537593728
+      ],
+      "quality_score": 0.727,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An984uNpTWg-1StrHcQ-2qB--HR34_FqWIeHsLCFlVrQD98rnXJQz1z7jOdOkX9at5IBVJ7L2CU0wRj8j-FdfIjbcayuzjmKXqHlSi49Uund7FTU-aqQHblLptYm5RcR8m2O4p02eIQm8tYf9r6ZeA?edm=ALXxkZ8EAAAA&_nc_gid=kWqin4gPl9rIib_77tnRKg&_nc_oc=AdquzkapiVpVtG8wE-3o312_VKAwwJtsjDOnxMtKFaPs2mgyp6Wh32iVm0qzEjVBqtM&ccb=10-5&oh=00_Af9KAKCeaxcV0Zckv2k_WCaXiFGyGMaAbNwXV4IRjeYfnA&oe=6A5EC57F&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/3701671393289068_1024.jpg"
+    },
+    {
+      "image_id": "1464734177204763",
+      "seq_id": "l27kwlcx3fjh7t6w9ccvic",
+      "captured_at_ms": 1562347870869,
+      "lon": -48.594594249273,
+      "lat": -27.587385648663,
+      "altitude": 8.5371720160481,
+      "camera_type": "fisheye",
+      "camera_parameters": [
+        0.46860340850821,
+        -0.056222673982389,
+        0.0045142114791229
+      ],
+      "width": 3840,
+      "height": 2160,
+      "make": "Blackvue",
+      "model": "DR900S-1CH",
+      "computed_rotation": [
+        0.93126601381715,
+        -1.1416597052142,
+        1.4706694404305
+      ],
+      "quality_score": 0.73,
+      "thumbnail_url": "https://scontent-fra5-1.xx.fbcdn.net/m1/v/t6/An-bzQmQOnkpCV-Una41e-EUyfslHbHiY8fx2OHEusIc9Ui6HGTR3KibWAk-Dn48nI8h77xB8KgAYqaul-CQThoCGPhZRmtC_i8gMmIcaiznd9hTvi-HDM_WG5LA64QNRkz_eiTFOu5ffN7hertb6g?edm=ALXxkZ8EAAAA&_nc_gid=Ok8V1IrMIWoDUZEyvH02_w&_nc_oc=Adp7vP0MPqjlU-QQK7TLCZM5nEx1T3y4T3P0VAPHvMrtiH1NJTV2GEVIQ-42jFYF3yc&ccb=10-5&oh=00_Af9YnJr6K0gbmrO7co-CfbeBS7Vn1uSQgswswsmtFWgSkg&oe=6A5E8EC1&_nc_sid=201bca",
+      "local_path": "qa/data/sample_dataset/imagery/l27kwlcx3fjh7t6w9ccvic/1464734177204763_1024.jpg"
     }
   ]
 }

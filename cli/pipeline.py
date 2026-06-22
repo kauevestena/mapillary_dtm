@@ -605,7 +605,8 @@ def run_pipeline(
                 vo_recon=vo,
                 imagery_root=imagery_root_path,
                 include_plane_sweep=False,
-                                mono_depths=mono_depths if options["include_monodepth"] else None,
+                mono_depths=mono_depths if options["include_monodepth"] else None,
+                heights=heights,
                 **options)
         return extracted
 

@@ -354,11 +354,11 @@ class COLMAPRunner:
             raise COLMAPUnavailable(f"COLMAP text export missing files: {missing}")
 
     def _using_docker(self) -> bool:
-        return shutil.which(self.colmap_cmd) is None and bool(os.getenv("COLMAP_DOCKER_IMAGE"))
+        return shutil.which(self.colmap_cmd) is None and shutil.which("docker") is not None
 
     def _docker_image_available(self) -> bool:
-        image = os.getenv("COLMAP_DOCKER_IMAGE")
-        if not image or shutil.which("docker") is None:
+        image = os.getenv("COLMAP_DOCKER_IMAGE", "colmap/colmap:latest")
+        if shutil.which("docker") is None:
             return False
         try:
             subprocess.run(
@@ -374,9 +374,7 @@ class COLMAPRunner:
 
     def _detect_version(self) -> str:
         if self._using_docker():
-            image = os.getenv("COLMAP_DOCKER_IMAGE")
-            if not image:
-                return "3.0"
+            image = os.getenv("COLMAP_DOCKER_IMAGE", "colmap/colmap:latest")
             command = [
                 "docker",
                 "run",
@@ -407,9 +405,7 @@ class COLMAPRunner:
     def _is_docker_gpu_available(self) -> bool:
         if not self._using_docker():
             return False
-        image = os.getenv("COLMAP_DOCKER_IMAGE")
-        if not image:
-            return False
+        image = os.getenv("COLMAP_DOCKER_IMAGE", "colmap/colmap:latest")
         try:
             res = subprocess.run(
                 ["docker", "run", "--gpus", "all", "--rm", image, "colmap", "help"],
@@ -428,9 +424,7 @@ class COLMAPRunner:
 
     def _run_colmap(self, args: list[str], *, workspace: Path, timeout: int) -> None:
         if self._using_docker():
-            image = os.getenv("COLMAP_DOCKER_IMAGE")
-            if not image:
-                raise COLMAPUnavailable("COLMAP_DOCKER_IMAGE is not set")
+            image = os.getenv("COLMAP_DOCKER_IMAGE", "colmap/colmap:latest")
             
             # Use --gpus all if GPU is requested and available
             use_gpu_docker = self.config.use_gpu and self._is_docker_gpu_available()

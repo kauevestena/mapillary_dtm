@@ -121,11 +121,10 @@ def test_height_solver_insufficient_gnss():
     opensfm = run_opensfm(seqs)
     colmap = run_colmap(seqs)
     vo = run_vo(seqs)
-    
-    # Should succeed with default scale of 1.0
-    scales, heights = solve_scale_and_h(opensfm, colmap, vo, [], seqs)
-    assert "test-seq" in scales
-    assert scales["test-seq"] == 1.0
+    import pytest
+    # Should fail instead of using a default scale of 1.0
+    with pytest.raises(ValueError, match="Failed to compute scale for any sequence"):
+        solve_scale_and_h(opensfm, colmap, vo, [], seqs)
 
 
 def test_height_solver_missing_altitudes():
@@ -149,12 +148,10 @@ def test_height_solver_missing_altitudes():
     opensfm = run_opensfm(seqs)
     colmap = run_colmap(seqs)
     vo = run_vo(seqs)
-    
-    scales, heights = solve_scale_and_h(opensfm, colmap, vo, [], seqs)
-    assert "test-seq" in heights
-    # Should use default midpoint
-    assert heights["test-seq"] == 2.0  # (H_MIN_M + H_MAX_M) / 2
-
+    import pytest
+    # Should fail instead of using default midpoint
+    with pytest.raises(ValueError, match="Failed to compute scale for any sequence"):
+        solve_scale_and_h(opensfm, colmap, vo, [], seqs)
 
 def test_height_solver_extreme_scale_clamping():
     """Test that extreme scale values are clamped appropriately."""
@@ -179,10 +176,10 @@ def test_height_solver_extreme_scale_clamping():
     colmap = run_colmap(seqs)
     vo = run_vo(seqs)
     
-    scales, heights = solve_scale_and_h(opensfm, colmap, vo, [], seqs)
-    assert "test-seq" in scales
-    # Scale should be clamped to [0.25, 4.0]
-    assert 0.25 <= scales["test-seq"] <= 4.0
+    import pytest
+    # Should fail because no anchors are provided and synthetic fallback is prohibited
+    with pytest.raises(ValueError, match="Failed to compute scale for any sequence"):
+        solve_scale_and_h(opensfm, colmap, vo, [], seqs)
 
 
 def test_height_solver_nan_handling():
@@ -208,8 +205,7 @@ def test_height_solver_nan_handling():
     colmap = run_colmap(seqs)
     vo = run_vo(seqs)
     
-    # Should handle missing altitude gracefully and still produce results
-    scales, heights = solve_scale_and_h(opensfm, colmap, vo, [], seqs)
-    assert "test-seq" in scales
-    assert np.isfinite(scales["test-seq"])
-    assert np.isfinite(heights["test-seq"])
+    import pytest
+    # Should fail because no anchors are provided and synthetic fallback is prohibited
+    with pytest.raises(ValueError, match="Failed to compute scale for any sequence"):
+        solve_scale_and_h(opensfm, colmap, vo, [], seqs)

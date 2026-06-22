@@ -40,7 +40,8 @@ def label_and_filter_points(
     include_plane_sweep: bool = True,
     vo_recon: Mapping[str, ReconstructionResult] | None = None,
     imagery_root: Path | str | None = None,
-        mono_depths: CacheResult | None = None,
+    mono_depths: CacheResult | None = None,
+    heights: Mapping[str, float] | None = None,
 ) -> List[GroundPoint]:
     """Return ground-only point samples enriched with QA metadata."""
 
@@ -72,6 +73,7 @@ def label_and_filter_points(
             continue
 
         scale = float(scales.get(seq_id, 1.0))
+        cam_height = float((heights or {}).get(seq_id, ASSUMED_CAM_HEIGHT))
         centers, headings = _camera_centers_and_headings(frames, pose_map, scale)
         if not centers:
             continue
@@ -100,6 +102,7 @@ def label_and_filter_points(
                     centers,
                     headings,
                     mono_data,
+                    cam_height=cam_height,
                 )
             )
         if include_plane_sweep:
@@ -111,7 +114,7 @@ def label_and_filter_points(
                 )
             )
         if vo_result is not None:
-            candidates.extend(_vo_candidates(vo_result, scale))
+            candidates.extend(_vo_candidates(vo_result, scale, cam_height=cam_height))
 
         seq_points = _evaluate_candidates(
             seq_id,
@@ -119,6 +122,7 @@ def label_and_filter_points(
             centers,
             mask_priors,
             candidates,
+            cam_height=cam_height,
         )
         collected.extend(seq_points)
 
@@ -156,6 +160,8 @@ def _monodepth_candidates(
     centers: Mapping[str, np.ndarray],
     headings: Mapping[str, np.ndarray],
     mono_data: Mapping[str, Mapping[str, np.ndarray]],
+    *,
+    cam_height: float = ASSUMED_CAM_HEIGHT,
 ) -> List[Tuple[np.ndarray, float, str]]:
     """Convert mono-depth grids to ground point hypotheses."""
 
@@ -190,7 +196,7 @@ def _monodepth_candidates(
                 lat_frac = (col / max(depth.shape[1] - 1, 1)) - 0.5
                 lateral = left * (lat_frac * lane_span)
                 forward = heading * d * 0.8  # down-weight to avoid overshooting
-                point = center + forward + lateral - up * ASSUMED_CAM_HEIGHT
+                point = center + forward + lateral - up * cam_height
                 base_uncert = float(uncert[row, col]) if uncert.shape == depth.shape else float(np.mean(uncert))
                 candidates.append((point.astype(np.float64), max(0.12, min(base_uncert, 0.45)), "mono"))
     return candidates
@@ -221,6 +227,8 @@ def _plane_sweep_candidates(
 def _vo_candidates(
     vo_result: ReconstructionResult,
     scale: float,
+    *,
+    cam_height: float = ASSUMED_CAM_HEIGHT,
 ) -> List[Tuple[np.ndarray, float, str]]:
     frames = list(vo_result.frames or [])
     if len(frames) < 2:
@@ -260,7 +268,7 @@ def _vo_candidates(
         for alpha in alphas:
             center = (1.0 - alpha) * p0 + alpha * p1
             for offset in offsets:
-                point = center + lateral * float(offset) - up * ASSUMED_CAM_HEIGHT
+                point = center + lateral * float(offset) - up * cam_height
                 candidates.append((point.astype(np.float64), float(base_uncert), "vo"))
 
     return candidates
@@ -272,6 +280,8 @@ def _evaluate_candidates(
     centers: Mapping[str, np.ndarray],
     mask_priors: Mapping[str, float],
     candidates: Iterable[Tuple[np.ndarray, float, str]],
+    *,
+    cam_height: float = ASSUMED_CAM_HEIGHT,
 ) -> List[GroundPoint]:
     results: List[GroundPoint] = []
     
@@ -303,7 +313,7 @@ def _evaluate_candidates(
         ground_z = point[2]
         
         subset_centers = cam_centers[indices]
-        dz = ground_z - (subset_centers[:, 2] - ASSUMED_CAM_HEIGHT)
+        dz = ground_z - (subset_centers[:, 2] - cam_height)
         valid_dz = np.abs(dz) <= 1.8
         
         valid_indices = np.array(indices)[valid_dz]

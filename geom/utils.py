@@ -37,3 +37,40 @@ def _to_local(lon: float, lat: float, h: float, lon0: float, lat0: float, h0: fl
         y = R * dlat
         z = h - h0
         return np.array([x, y, z], dtype=float)
+
+def umeyama_alignment(src: np.ndarray, dst: np.ndarray, estimate_scale: bool = True) -> Tuple[np.ndarray, np.ndarray, float]:
+    """
+    Computes the Umeyama similarity transform to align src to dst.
+    Returns (R, t, s) such that dst ~ s * R @ src + t
+    """
+    num = src.shape[0]
+    if num < 3:
+        return np.eye(3), np.zeros(3), 1.0
+
+    src_mean = src.mean(axis=0)
+    dst_mean = dst.mean(axis=0)
+
+    src_demean = src - src_mean
+    dst_demean = dst - dst_mean
+
+    A = dst_demean.T @ src_demean / num
+
+    d_src = np.var(src, axis=0).sum()
+
+    U, S, Vt = np.linalg.svd(A)
+    R = U @ Vt
+    
+    # Handle reflection
+    if np.linalg.det(R) < 0:
+        S[-1] = -S[-1]
+        U[:, -1] = -U[:, -1]
+        R = U @ Vt
+
+    s = 1.0
+    if estimate_scale and d_src > 1e-8:
+        s = 1.0 / d_src * S.sum()
+
+    t = dst_mean - s * R @ src_mean
+
+    return R, t, s
+

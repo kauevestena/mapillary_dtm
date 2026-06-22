@@ -61,6 +61,11 @@ H_MAX_M: float = 3.0
 SCALE_GNSS_WT: float = 0.3
 SCALE_ANCHOR_WT: float = 0.7
 
+# Camera-to-ground height constraint (per-sequence LS estimation)
+# See documentation/extras/car_suspension_displacement.md
+SUSPENSION_RMS_M: float = 0.03   # ±3 cm RMS vertical body motion on normal roads
+SUSPENSION_OUTLIER_M: float = 0.10  # ±10 cm hard outlier rejection threshold
+
 # Ground masking
 GROUND_PROB_MIN: float = 0.6
 EXCLUDE_CLASSES = {"vehicle", "person", "bike"}

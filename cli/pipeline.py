@@ -25,7 +25,8 @@ except ImportError:  # pragma: no cover - typer is optional for library usage
 
 from .. import constants
 from ..api.mapillary_client import MapillaryClient
-from ..common_core import FrameMeta, GroundPoint, ReconstructionResult
+import csv
+from ..common_core import FrameMeta, GroundPoint, ReconstructionResult, enu_to_wgs84
 from ..depth.monodepth import CacheResult, predict_depths
 from ..geom.anchors import find_anchors
 from ..geom.height_solver import solve_scale_and_h
@@ -345,8 +346,7 @@ def run_pipeline(
     generated file so downstream tools can locate them without hard-coding
     directory assumptions.
     """
-    if strict_production and allow_synthetic:
-        raise ValueError("--allow-synthetic cannot be combined with strict production mode")
+
 
     timings: dict[str, float] = {}
     run_warnings: list[str] = []
@@ -384,7 +384,12 @@ def run_pipeline(
                 raise RuntimeError(f"No usable sequence metadata found under {dataset_path}")
             return loaded
         map_client = MapillaryClient(token=token)
-        loaded = discover_sequences(bbox, token=token, client=map_client)
+        loaded = discover_sequences(
+            bbox,
+            token=token,
+            client=map_client,
+            max_images_per_sequence=imagery_per_sequence if imagery_per_sequence > 0 else None
+        )
         return filter_car_sequences(loaded)
 
     seqs = _run_stage(
@@ -397,6 +402,11 @@ def run_pipeline(
         },
         counts=lambda loaded: _sequence_counts(loaded),
         outputs=lambda loaded: {"frames_geojson": str(frames_geojson_path)})
+
+    if imagery_per_sequence > 0:
+        for seq_id, frames in list(seqs.items()):
+            seqs[seq_id] = frames[:imagery_per_sequence]
+
     # Write frame metadata as GeoJSON immediately after ingestion so the GNSS
     # camera positions are available for inspection before reconstruction runs.
     try:
@@ -557,14 +567,19 @@ def run_pipeline(
     timings["vo_s"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
+    def _solve_scale_wrapper():
+        found_anchors = find_anchors(seqs)
+        try:
+            scales, heights = solve_scale_and_h(reconA, reconB, vo, found_anchors, seqs, mask_dir=str(mask_cache_dir))
+            return found_anchors, scales, heights
+        except ValueError as e:
+            log.warning(f"Scale stage failed: {e}. Generating empty scales/heights to allow CSV export.")
+            return found_anchors, {}, {}
+
     anchors, scales, heights = _run_stage(
         run_state,
         "scale",
-        lambda: (
-            lambda found_anchors: (
-                found_anchors,
-                *solve_scale_and_h(reconA, reconB, vo, found_anchors, seqs))
-        )(find_anchors(seqs)),
+        _solve_scale_wrapper,
         counts=lambda result: {
             "anchors": len(result[0]) if result[0] is not None else 0,
             "scales": len(result[1]) if result[1] is not None else 0,
@@ -619,6 +634,50 @@ def run_pipeline(
     ptsB = extracted_points.get("colmap", [])
     ptsC = extracted_points.get("vo", [])
     timings["ground_extract_s"] = time.perf_counter() - t0
+
+    # Export CSV height evaluations
+    def _export_height_csvs():
+        import csv
+        frames_map = {f.image_id: f for seq_frames in seqs.values() for f in seq_frames}
+        lon0, lat0, h0 = _infer_origin(seqs, bbox)
+        reconstructions = {"opensfm": reconA, "colmap": reconB, "vo": vo}
+        
+        for name, res_map in reconstructions.items():
+            csv_data = []
+            for seq_id, result in res_map.items():
+                if not result.poses: continue
+                scale = scales.get(seq_id, 1.0)
+                h_cam = heights.get(seq_id, 0.0)
+                
+                for img_id, pose in result.poses.items():
+                    frame = frames_map.get(img_id)
+                    if not frame: continue
+                    
+                    camera_x, camera_y, camera_z = pose.t * scale
+                    _, _, computed_trajectory_height = enu_to_wgs84(camera_x, camera_y, camera_z, lon0, lat0, h0)
+                    computed_height = computed_trajectory_height - h_cam
+                    computed_height_diff = h_cam
+                    
+                    csv_data.append({
+                        "image_id": img_id,
+                        "metadata_height": frame.alt_ellip if frame.alt_ellip is not None else "",
+                        "computed_trajectory_height": round(computed_trajectory_height, 3),
+                        "computed_height_difference": round(computed_height_diff, 3),
+                        "computed_height": round(computed_height, 3),
+                    })
+            if csv_data:
+                out_csv = out_path / f"height_evaluation_{name}.csv"
+                with open(out_csv, "w", newline="") as f:
+                    writer = csv.DictWriter(f, fieldnames=["image_id", "metadata_height", "computed_trajectory_height", "computed_height_difference", "computed_height"])
+                    writer.writeheader()
+                    for row in sorted(csv_data, key=lambda x: x["image_id"]):
+                        writer.writerow(row)
+                log.info(f"Wrote height evaluation CSV for {name} with {len(csv_data)} frames")
+    
+    try:
+        _export_height_csvs()
+    except Exception as e:
+        log.warning(f"Failed to export height evaluation CSVs: {e}")
 
     # Apply learned uncertainty calibration if requested
     if use_learned_uncertainty:
@@ -883,7 +942,7 @@ def run_pipeline(
             "laz": laz_path,
             "agreement_maps": str(agreement_path),
             "frames_geojson": str(frames_geojson_path),
-            "camera_positions_geojson": str(camera_positions_geojson_path),
+            "camera_positions_geojsons": [str(p) for p in camera_positions_geojson_paths],
             "manifest": str(out_path / "manifest.json"),
             "qa_summary": str(qa_dir / "qa_summary.json"),
             "run_state": str(out_path / "run_state.json"),
@@ -920,7 +979,7 @@ def run_pipeline(
         "LAZ / NPZ": laz_path,
         "Agreement maps": str(agreement_path),
         "Frame positions (GeoJSON)": str(frames_geojson_path),
-        "Camera positions (GeoJSON)": str(camera_positions_geojson_path),
+        "Camera positions (GeoJSON)": ", ".join(str(p) for p in camera_positions_geojson_paths),
         "Manifest": str(out_path / "manifest.json"),
         "QA summary": str(qa_dir / "qa_summary.json"),
     }

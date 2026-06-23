@@ -314,6 +314,8 @@ def _evaluate_candidates(
         
         subset_centers = cam_centers[indices]
         dz = ground_z - (subset_centers[:, 2] - cam_height)
+        if i < 5:
+            print(f"DEBUG: pt={point}, ground_z={ground_z}, cam_z={subset_centers[0, 2]}, cam_height={cam_height}, dz={dz}")
         valid_dz = np.abs(dz) <= 1.8
         
         valid_indices = np.array(indices)[valid_dz]
@@ -326,7 +328,7 @@ def _evaluate_candidates(
         probs = cam_priors[valid_indices]
         
         sem_prob = float(np.clip(np.average(probs, weights=weights), 0.0, 1.0))
-        if sem_prob < 0.5:
+        if sem_prob < 0.15:
             continue
             
         sort_idx = np.argsort(-weights)

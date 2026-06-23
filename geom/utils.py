@@ -66,6 +66,14 @@ def umeyama_alignment(src: np.ndarray, dst: np.ndarray, estimate_scale: bool = T
         U[:, -1] = -U[:, -1]
         R = U @ Vt
 
+    # For 1D trajectories, SVD might arbitrarily flip the "Up" vector (Z-axis).
+    # If the Z-axis is flipped (R[2, 2] < 0), we can rotate by 180 deg around the dominant axis
+    # by negating the 2nd and 3rd columns of U.
+    if R[2, 2] < 0:
+        U[:, 1] = -U[:, 1]
+        U[:, 2] = -U[:, 2]
+        R = U @ Vt
+
     s = 1.0
     if estimate_scale and d_src > 1e-8:
         s = 1.0 / d_src * S.sum()

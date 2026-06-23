@@ -94,7 +94,9 @@ def main():
                 continue
                 
             scale = scales.get(seq_id, 1.0)
-            h_cam = h_cam_per_seq.get(seq_id, 2.0)
+            h_cam = h_cam_per_seq.get(seq_id)
+            if h_cam is None:
+                raise ValueError(f"Sequence {seq_id}: Cannot estimate h_cam and synthetic fallback is prohibited.")
             
             for img_id, pose in result.poses.items():
                 frame = frames_map.get(img_id)

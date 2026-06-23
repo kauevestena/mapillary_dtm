@@ -203,3 +203,5 @@ __pycache__/
 imagery_cache
 out_eval
 out_eval_prod
+
+qa/bbox_test

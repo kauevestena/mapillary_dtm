@@ -67,15 +67,12 @@ def align_reconstruction_to_gnss(recon: ReconstructionResult, frames: list[Frame
 
 def _estimate_h_cam_ls(
     recon: ReconstructionResult,
-    frames: list[FrameMeta],
-    anchors: list[Anchor],
+    frames: Iterable[FrameMeta],
+    anchors: Iterable[Anchor],
+    ground_points: Iterable[GroundPoint] = None,
 ) -> float:
     """Estimate camera-above-ground height via iteratively reweighted LS.
-
-    Collects per-frame observations of (camera_Z - ground_Z) using GNSS
-    altitudes and anchor heights, then fits a single ``h_cam`` with
-    iterative outlier rejection based on suspension displacement tolerance.
-
+    
     Parameters
     ----------
     recon : ReconstructionResult
@@ -116,12 +113,30 @@ def _estimate_h_cam_ls(
                     if np.isfinite(obs) and constants.H_MIN_M <= obs <= constants.H_MAX_M:
                         observations.append(obs)
 
-    # Strategy 2: Without anchors, we cannot isolate the camera-to-ground
-    # height from GNSS data alone (GNSS altitude = ground_elevation + h_cam,
-    # and we don't know ground_elevation independently).
+    # Strategy 2: Use Sparse Ground Points
+    if not observations and ground_points:
+        import scipy.spatial
+        ground_pts = np.array([[p.x, p.y, p.z] for p in ground_points], dtype=np.float64)
+        if ground_pts.size > 0:
+            cam_centers = []
+            for frame in frames:
+                if frame.image_id in recon.poses:
+                    cam_centers.append(recon.poses[frame.image_id].t)
+            if cam_centers:
+                cam_centers = np.array(cam_centers, dtype=np.float64)
+                tree = scipy.spatial.cKDTree(cam_centers[:, :2])
+                indices_list = tree.query_ball_point(ground_pts[:, :2], r=12.0)
+                for i, indices in enumerate(indices_list):
+                    if indices:
+                        cam_z_vals = cam_centers[indices, 2]
+                        diffs = cam_z_vals - ground_pts[i, 2]
+                        # Filter out extreme values before adding to observations
+                        valid_diffs = diffs[(diffs > 0.5) & (diffs < 3.5)]
+                        observations.extend(valid_diffs.tolist())
+
     if not observations:
         raise ValueError(
-            "Cannot estimate h_cam: No valid ground control anchors available to "
+            "Cannot estimate h_cam: No valid ground control anchors or ground points available to "
             "establish true ground elevation, and synthetic fallback is prohibited. "
             "Dataset must include anchors or be expanded to allow estimation."
         )
@@ -157,6 +172,7 @@ def solve_scale_and_h(
     vo: Mapping[str, ReconstructionResult],
     anchors: Iterable[Anchor],
     seqs: Mapping[str, Iterable[FrameMeta]],
+    mask_dir: str | None = None,
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """Compute per-sequence scale factors and camera heights.
 
@@ -229,8 +245,21 @@ def solve_scale_and_h(
 
             # Estimate h_cam for this (sequence, reconstruction) pair
             seq_anchors = anchors_by_seq.get(seq_id, [])
+            ground_points = None
+            if mask_dir and not seq_anchors and recon.points_xyz is not None and recon.points_xyz.size > 0:
+                from ..ground.ground_extract_3d import label_and_filter_points
+                recon.frames = frames_list
+                # Pass a dummy recon map with just this sequence
+                temp_recon_map = {seq_id: recon}
+                temp_scales = {seq_id: 1.0}
+                ground_points = label_and_filter_points(
+                    temp_recon_map, temp_scales, mask_dir=mask_dir,
+                    include_sparse=True, include_monodepth=False, include_plane_sweep=False
+                )
+                logger.info(f"Sequence {seq_id} / {recon_name}: extracted {len(ground_points)} ground points. recon.points_xyz.size={recon.points_xyz.size}, frames={len(frames_list)}")
+
             try:
-                h = _estimate_h_cam_ls(recon, frames_list, seq_anchors)
+                h = _estimate_h_cam_ls(recon, frames_list, seq_anchors, ground_points=ground_points)
                 h_cam_estimates.append(h)
                 logger.info(
                     f"Sequence {seq_id} / {recon_name}: "

@@ -1,0 +1,40 @@
+name: Slope model validation
+on:
+  push:
+    branches: [main, 'feature/accessibility-slope-models']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-and-gis:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -e '.[dev]'
+      - run: .venv/bin/python -m unittest discover -s tests/slope -v
+      - run: .venv/bin/python -m slope_from_mapillary audit-dataset qa/data/sample_dataset
+  real-image-inference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+      - run: .venv/bin/python -m pip install -e '.[dev,segmentation]'
+      - run: .venv/bin/python -m unittest discover -s tests/slope -p test_model_inference.py -v
+        env:
+          SLOPE_TEST_REAL_MODELS: '1'
+          HF_HUB_DISABLE_TELEMETRY: '1'

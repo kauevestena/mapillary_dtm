@@ -471,109 +471,24 @@ class COLMAPRunner:
             )
 
     # ------------------------------------------------------------------
-    def _load_fixture(
-        self,
-        fixture_root: Path,
-        sequences: Mapping[str, Iterable[FrameMeta]],
-    ) -> Dict[str, ReconstructionResult]:
-        """Load a sparse reconstruction exported via `colmap model_converter --output_type TXT`."""
-        if fixture_root.is_dir():
-            cameras_path = fixture_root / "cameras.txt"
-            images_path = fixture_root / "images.txt"
-            points_path = fixture_root / "points3D.txt"
-        else:
-            raise FileNotFoundError(
-                f"COLMAP fixture {fixture_root} is not a directory containing cameras.txt/images.txt/points3D.txt"
-            )
-
-        for required in (cameras_path, images_path, points_path):
-            if not required.exists():
-                raise FileNotFoundError(f"Missing COLMAP fixture component: {required}")
-
-        cameras = _parse_cameras(cameras_path)
-        images = _parse_images(images_path)
-        points = _parse_points(points_path)
-
-        frames_by_id: Dict[str, FrameMeta] = {}
+    def _load_fixture(self, fixture_root: Path, sequences: Mapping[str, Iterable[FrameMeta]]) -> Dict[str, ReconstructionResult]:
+        from slope_from_mapillary.reconstruction import load_colmap
+        model = load_colmap(fixture_root)
+        results = {}
         for seq_id, frames in sequences.items():
-            for frame in frames:
-                frames_by_id[frame.image_id] = frame
-
-        per_sequence_frames: Dict[str, list[FrameMeta]] = {}
-        per_sequence_poses: Dict[str, Dict[str, Pose]] = {}
-        image_id_to_seq: Dict[int, str] = {}
-        image_id_to_frame: Dict[int, FrameMeta] = {}
-
-        for image in images:
-            frame = _resolve_frame(frames_by_id, image.name)
-            if frame is None:
-                log.debug("Skipping COLMAP image %s (no matching FrameMeta)", image.name)
+            index = {frame.image_id: frame for frame in frames}
+            selected = [(name, _resolve_frame(index, name)) for name in model.shots]
+            selected = [(name, frame) for name, frame in selected if frame is not None]
+            if not selected:
                 continue
-
-            camera = cameras.get(image.camera_id)
-            if camera is None:
-                log.warning("COLMAP image %s references unknown camera %d", image.name, image.camera_id)
-                continue
-
-            updated_params = _merge_camera_params(frame.cam_params, camera)
-            refined_frame = FrameMeta(
-                image_id=frame.image_id,
-                seq_id=frame.seq_id,
-                captured_at_ms=frame.captured_at_ms,
-                lon=frame.lon,
-                lat=frame.lat,
-                alt_ellip=frame.alt_ellip,
-                camera_type=updated_params.pop("_camera_type"),
-                cam_params=updated_params,
-                quality_score=frame.quality_score,
-                thumbnail_url=frame.thumbnail_url,
-            )
-
-            per_sequence_frames.setdefault(frame.seq_id, []).append(refined_frame)
-            pose_map = per_sequence_poses.setdefault(frame.seq_id, {})
-            pose_map[frame.image_id] = Pose(R=image.rotation_wc, t=image.center)
-            image_id_to_seq[image.image_id] = frame.seq_id
-            image_id_to_frame[image.image_id] = frame
-
-        points_by_seq: Dict[str, list[list[float]]] = {seq: [] for seq in per_sequence_frames}
-
-        for point in points:
-            assigned = False
-            for image_id in point.observations:
-                seq_id = image_id_to_seq.get(image_id)
-                if seq_id is None:
-                    continue
-                points_by_seq.setdefault(seq_id, []).append(point.xyz)
-                assigned = True
-                break
-            if not assigned:
-                log.debug("COLMAP point %d has no known observations; skipping", point.point_id)
-
-        results: Dict[str, ReconstructionResult] = {}
-        for seq_id, frames in per_sequence_frames.items():
-            frames_sorted = sorted(frames, key=lambda f: f.captured_at_ms)
-            poses = per_sequence_poses.get(seq_id, {})
-            points_list = points_by_seq.get(seq_id, [])
-            points_xyz = (
-                np.asarray(points_list, dtype=np.float32)
-                if points_list
-                else np.zeros((0, 3), dtype=np.float32)
-            )
-            metadata = {
-                "fixture": str(fixture_root),
-                "point_count": int(points_xyz.shape[0]),
-                "cameras_refined": False,
-                "coordinate_frame": "enu",
-            }
-            results[seq_id] = ReconstructionResult(
-                seq_id=seq_id,
-                frames=frames_sorted,
-                poses=poses,
-                points_xyz=points_xyz,
-                source="colmap",
-                metadata=metadata,
-            )
-
+            names = {name for name, _ in selected}
+            poses = {frame.image_id: Pose(model.shots[name].rotation_cw.T, model.shots[name].center)
+                     for name, frame in selected}
+            xyz = np.asarray([point.xyz for point in model.points.values()
+                              if names.intersection(point.observations)], dtype=float).reshape(-1, 3)
+            results[seq_id] = ReconstructionResult(seq_id, [frame for _, frame in selected], poses,
+                xyz, "colmap", metadata={"reconstruction_path": str(fixture_root),
+                "coordinate_frame": "reconstruction", "source_type": "cached_reconstruction"})
         return results
 
 

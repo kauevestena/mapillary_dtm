@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "crs": "EPSG:32722",
+  "resolution_m": 0.5,
+  "max_cells": 2000000,
+  "surfaces": {
+    "1": {
+      "id": "road",
+      "kind": "road"
+    },
+    "2": {
+      "id": "sidewalk",
+      "kind": "sidewalk"
+    },
+    "3": {
+      "id": "terrain",
+      "kind": "terrain"
+    }
+  },
+  "reconstructions": [
+    {
+      "id": "capture-1",
+      "evidence_group": "capture-1",
+      "format": "opensfm",
+      "path": "../qa/data/sample_dataset/geometry/opensfm/l27kwlcx3fjh7t6w9ccvic/reconstruction.json",
+      "component": 0,
+      "masks": "surface_masks",
+      "vertical_reference": null,
+      "geometry_uncertainty_deg": null,
+      "geometry_uncertainty_evidence": null,
+      "georeference": {
+        "source": "Mapillary horizontal GNSS metadata",
+        "controls": [
+          {
+            "image": "1464734177204763.jpg",
+            "longitude": -48.594594249273,
+            "latitude": -27.587385648663
+          },
+          {
+            "image": "509059190130782.jpg",
+            "longitude": -48.594772679616,
+            "latitude": -27.587352325843
+          },
+          {
+            "image": "530796564614344.jpg",
+            "longitude": -48.594673522337,
+            "latitude": -27.587370713204
+          },
+          {
+            "image": "468020011157631.jpg",
+            "longitude": -48.594792514753,
+            "latitude": -27.587348663971
+          },
+          {
+            "image": "549798756007659.jpg",
+            "longitude": -48.594733009343,
+            "latitude": -27.587359649588
+          },
+          {
+            "image": "3701671393289068.jpg",
+            "longitude": -48.594614067568,
+            "latitude": -27.587381914792
+          },
+          {
+            "image": "1197003347412468.jpg",
+            "longitude": -48.594633885747,
+            "latitude": -27.587378180944
+          },
+          {
+            "image": "487967815974661.jpg",
+            "longitude": -48.594831899666,
+            "latitude": -27.587340216216
+          },
+          {
+            "image": "595114328129242.jpg",
+            "longitude": -48.594812263897,
+            "latitude": -27.587344650109
+          },
+          {
+            "image": "170058561705143.jpg",
+            "longitude": -48.594693340517,
+            "latitude": -27.587366979355
+          },
+          {
+            "image": "291129559315209.jpg",
+            "longitude": -48.594653704042,
+            "latitude": -27.587374447074
+          },
+          {
+            "image": "177246630949005.jpg",
+            "longitude": -48.594713174206,
+            "latitude": -27.587363311461
+          }
+        ],
+        "max_residual_m": 3.0,
+        "min_baseline_m": 10.0
+      },
+      "tracks": "../qa/data/sample_dataset/geometry/opensfm/l27kwlcx3fjh7t6w9ccvic/tracks.csv"
+    }
+  ],
+  "paths": null,
+  "screening_thresholds": null,
+  "max_disagreement_deg": 2.0,
+  "write_lineage": true,
+  "attribution": "Mapillary imagery contributors; see source image IDs in reconstruction/lineage"
+}

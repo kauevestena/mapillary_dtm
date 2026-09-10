@@ -1,103 +1,16 @@
-"""
-Centralized configuration knobs and thresholds.
-Change values here to tune behavior without touching the modules.
+"""Acquisition and optional SfM backend settings.
+
+Slope/quality policies live in the versioned slope project JSON, not here.
 """
 import os
 
-# ── GPU / acceleration ──────────────────────────────────────────────
-GPU_AUTO_DETECT: bool = True  # Auto-detect CUDA/MPS; set False to force CPU
-MONODEPTH_BATCH_SIZE: int = 4  # Frames per GPU batch for depth inference
-GROUND_MASK_BATCH_SIZE: int = 4  # Frames per GPU batch for segmentation
-
-# Spatial resolution
-GRID_RES_M: float = 0.5
-TILE_SIZE_M: int = 512
-
-# Corridor (OSM-based, via OSMnx)
-CORRIDOR_HALF_W_M: float = 25.0  # buffer around streets for "in-corridor" region
-MAX_TIN_EXTRAPOLATION_M: float = 5.0  # limit when filling outside corridor
-INCLUDE_INNER_BLOCKS: bool = True  # holes inside corridor polygons are filled
-OSM_HIGHWAYS = [
-    "motorway",
-    "trunk",
-    "primary",
-    "secondary",
-    "tertiary",
-    "unclassified",
-    "residential",
-    "service",
-    "trunk_link",
-    "motorway_link",
-    "primary_link",
-    "secondary_link",
-    "tertiary_link",
-]
-
-# Imagery & selection
-# Car sequences: 30 km/h min reflects slower urban driving (residential streets, traffic)
-# while still excluding pedestrian/bicycle sequences which typically stay under 25 km/h
-MIN_SPEED_KMH: float = 30.0
-MAX_SPEED_KMH: float = 120.0
+# Walking and cycling imagery are eligible; quality is measured by geometry.
+MIN_SPEED_KMH = 0.0
+MAX_SPEED_KMH = 150.0
 ALLOW_CAMERA_TYPES = {"perspective", "fisheye", "spherical"}
-QUALITY_SCORE_MIN: float = 0.2
-
-# SfM / VO / BA
-MIN_TRIANG_ANGLE_DEG: float = 2.0
-RANSAC_THRESH_PX: float = 1.0
-LO_WINDOW_N: int = 5
-COLMAP_DEFAULT_THREADS: int = 8
-COLMAP_USE_GPU: bool = os.getenv("COLMAP_USE_GPU", "").strip() in {"1", "true", "True", "TRUE"} or (
-    os.getenv("COLMAP_USE_GPU") is None  # auto-detect when not explicitly set
-)
-VO_ORB_FEATURES: int = 2000
-VO_MIN_INLIERS: int = 35
-VO_RANSAC_THRESH: float = 1.0
-VO_USE_RATIO_TEST: bool = True
-VO_RATIO_TEST: float = 0.75
-
-# Height & scale
-H_MIN_M: float = 1.0
-H_MAX_M: float = 3.0
-SCALE_GNSS_WT: float = 0.3
-SCALE_ANCHOR_WT: float = 0.7
-
-# Camera-to-ground height constraint (per-sequence LS estimation)
-# See documentation/extras/car_suspension_displacement.md
-SUSPENSION_RMS_M: float = 0.03   # ±3 cm RMS vertical body motion on normal roads
-SUSPENSION_OUTLIER_M: float = 0.10  # ±10 cm hard outlier rejection threshold
-
-# Ground masking
-GROUND_PROB_MIN: float = 0.6
-EXCLUDE_CLASSES = {"vehicle", "person", "bike"}
-
-# Fusion / surface
-LOWER_ENVELOPE_Q: float = 0.25
-SMOOTHING_SIGMA_M: float = 0.7
-SLOPE_FROM_FIT_SIZE: int = 5
-
-# Consensus
-DZ_MAX_M: float = 0.25
-DSLOPE_MAX_DEG: float = 2.0
-MIN_SUPPORT_VIEWS: int = 3
-
-# Elevated structures
-EXCLUDE_ELEVATED_STRUCTURES: bool = True
-ELEVATED_METHOD: str = "auto"  # "auto" => parallax + OSM bridge/tunnel tags
-
-# QA
-CHECKPOINT_BUFFER_M: float = 2.0
-
-# Breakline enforcement
-BREAKLINE_ENABLED: bool = False  # Toggle via CLI
-BREAKLINE_PROJ_PROB_BAND: tuple[float, float] = (
-    0.45,
-    0.6,
-)  # Ground mask gradient range
-BREAKLINE_MERGE_DIST_M: float = 0.5  # Merge segments within this distance
-BREAKLINE_SIMPLIFY_TOL_M: float = 0.1  # Douglas-Peucker tolerance
-BREAKLINE_DENSIFY_MAX_SPACING_M: float = 0.5  # Vertex resampling interval
-BREAKLINE_MIN_LENGTH_M: float = 2.0  # Discard short segments
-BREAKLINE_MAX_HEIGHT_DEV_M: float = 0.3  # Outlier filter threshold
+QUALITY_SCORE_MIN = 0.2
+COLMAP_DEFAULT_THREADS = 8
+COLMAP_USE_GPU = os.getenv("COLMAP_USE_GPU", "").lower() in {"1", "true"}
 
 # API
 MAPILLARY_GRAPH_URL = "https://graph.mapillary.com"
@@ -139,5 +52,3 @@ bbox = {
     "max_lat": -27.586780,
 }  # Florianópolis, SC, Brazil
 
-# Semantics
-MIN_ROAD_MASK_RATIO = 0.05

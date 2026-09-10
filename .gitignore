@@ -205,3 +205,9 @@ out_eval
 out_eval_prod
 
 qa/bbox_test
+
+# Slope products, local project copies and model caches
+out/
+surface_masks/
+slope_project.json
+qa/outputs/

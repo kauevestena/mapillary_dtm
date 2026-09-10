@@ -1,98 +1,71 @@
-# Mapillary DTM Architecture
+# Slope model architecture
 
-This document describes the high-level architecture and data flow of the `mapillary_dtm` pipeline. The pipeline focuses on maximizing accuracy via redundancy and cross-validation, using multiple independent reconstruction backends, and strictly requiring ground-only semantic evidence.
-
-## Pipeline Diagram
+The primary package is `slope_from_mapillary`. The historical name
+`dtm_from_mapillary` remains only for repository-local acquisition/backend imports
+and a command-line redirect. The elevation measurement pipeline has been retired.
 
 ```mermaid
-graph TD
-    %% Ingestion
-    subgraph Data Ingestion & Preflight
-        A[AOI Bounding Box] --> B(Mapillary API Client)
-        B --> C{Sequence Scanner}
-        C -->|Raw Sequences| D[Car-only Filter]
-        D --> E[Filtered Sequences]
-        E --> F[Imagery Fetch / Cache]
-    end
-
-    %% Semantics
-    subgraph Semantics
-        F --> G[Ground Masks Segmentation]
-        F --> H[Curb / Lane Extraction]
-    end
-
-    %% Geometry
-    subgraph Geometry Tracks
-        F --> I(OpenSfM Reconstruction)
-        F --> J(COLMAP / DIM Reconstruction)
-        F --> K(Visual Odometry - OpenCV)
-    end
-
-    %% Scale & Height Solver
-    subgraph Scale & Height
-        E --> L[Semantic Anchors Detection]
-        L --> M[Height & Scale Solver]
-        I --> M
-        J --> M
-        K --> M
-        M -->|Scale & Height| N(Metric Calibrated Trajectories)
-    end
-
-    %% Monodepth
-    subgraph Monocular Depth
-        F --> O[Midas Monodepth Prediction]
-    end
-
-    %% Ground Extraction
-    subgraph Ground Extraction
-        I --> P[Ground Point Extraction]
-        J --> P
-        K --> P
-        G --> P
-        N --> P
-        O --> P
-        P -->|Track A Ground Points| QA[Track A]
-        P -->|Track B Ground Points| QB[Track B]
-        P -->|Track C Ground Points| QC[Track C]
-    end
-
-    %% Consensus & TIN
-    subgraph Consensus & Boundary Fill
-        QA --> R{Consensus Agree}
-        QB --> R
-        QC --> R
-        R -->|Voxel Agreement| S[Consensus Ground Points]
-        
-        H --> T[3D Breakline Projection]
-        T --> U[Constrained TIN]
-        S --> U
-        
-        A --> V[OSMnx Corridor Polygon]
-        V --> W[Corridor Mask & TIN Sample]
-        U --> W
-        W --> X[Final 3D Points including Corridor Fill]
-    end
-
-    %% Fusion
-    subgraph Fusion & Smoothing
-        X --> Y[Heightmap Lower-Envelope Fusion]
-        Y --> Z[Edge-Aware Smoothing]
-        Z --> AA[0.5m DTM Raster]
-        AA --> AB[Slope Rasters]
-    end
-
-    %% QA & Export
-    subgraph QA & Output
-        AA --> AC[Internal QA - Agreement Maps]
-        AA --> AD[External QA vs Geotiff]
-        AA --> AE(HTML Report & TIFF/LAZ Export)
-    end
+flowchart TD
+  A["Images and calibrated cameras"] --> B["OpenSfM or COLMAP"]
+  B --> C["3D points and observed feature tracks"]
+  A --> D["Reviewed surface labels"]
+  C --> E["Multi-view surface selection"]
+  D --> E
+  F["Independent vertical reference"] --> G["Level frame and horizontal registration"]
+  H["Horizontal camera controls"] --> G
+  E --> G
+  G --> I["Local plane and support tests"]
+  I --> J["Surface-wise normal agreement"]
+  J --> K["Observed slope cells"]
+  L["Directed pedestrian paths"] --> M["Longitudinal and cross slope"]
+  K --> M
+  K --> N["Held-out slope comparison"]
+  O["Independent field measurements"] --> N
 ```
 
-## Core Principles
+## Module boundaries
 
-1.  **Strict Production Run:** The pipeline strictly runs on actual models (e.g., PyTorch models for monodepth/segmentation, COLMAP, OpenSfM) and fails fast if the necessary infrastructure is unavailable. Mocks and synthetic fallbacks are strictly not used to guarantee data science integrity.
-2.  **Redundancy everywhere**: Two independent SfM stacks (OpenSfM, COLMAP) plus VO, resolving consensus.
-3.  **Metric scale**: Derived from constant camera height per sequence, GNSS distance consistency, and semantic footpoint anchors.
-4.  **Ground-only focus**: 3D semantic voting from per-image ground masks; rejection of dynamic obstacles.
-5.  **Slope fidelity**: Edge-aware smoothing and breakline enforcement preserving curbs/crowns.
+| Module | Responsibility |
+| --- | --- |
+| `reconstruction.py` | Parse native poses and actual feature tracks; keep component frames explicit |
+| `reference.py` | Independent up vector, calibrated IMU helper, robust horizontal similarity |
+| `surfaces.py` | Vote per observed feature pixel; reject unknown classes and weak geometry |
+| `segmentation.py` | Optional real dense semantic model inference, with model/image provenance |
+| `estimation.py` | Robust plane fitting, support gates, gradients, directional uncertainty |
+| `grid.py` | Supported cells and full-normal agreement; shared images count as one evidence group |
+| `output.py` | GeoTIFF/GeoJSON/report export and exact path splitting at grid boundaries |
+| `validation.py` | Compare exports against independent reference observations; no feedback to fitting |
+| `pipeline.py` | One orchestration path, configuration validation, audits and input hashes |
+| `cli.py` | Prepare, audit, segment, run and validate commands |
+
+## Contracts
+
+A project has one local metric CRS, explicit semantic surface IDs, and one or more
+reconstruction records. Each record has its own raw coordinate system, vertical
+reference, horizontal controls, masks, and evidence group. Georeferencing never
+uses altitude. A single isotropic scale applies to all three axes.
+
+An OpenSfM component is loaded explicitly by index. COLMAP input is one exported
+component directory. Do not join component coordinates or vertical datums before
+estimating normals. The retained backend runners delegate cached-model parsing
+to the same native readers used by the slope pipeline.
+
+For each surface and reconstruction, only nearby measured points are considered.
+The cell center and all four cell corners must be inside the accepted point hull
+and close to actual inliers. Residual, two-dimensional support and conditioning
+gates reject discontinuities and unstable planes. There is no DTM interpolation.
+
+Overlapping measurements are compared by their **full upward normals**. Equal
+slope magnitudes pointing in opposite directions do not count as agreement.
+Disagreement removes the cell. Agreement does not establish truth, and adding a
+backend on the same images does not increase the independent-capture count.
+
+Paths select a surface explicitly. A road estimate cannot silently replace a
+sidewalk estimate. Multiple physical levels need different IDs even if both are
+classified as road. Automated segmentation distinguishes semantic kinds only;
+reviewed instance masks are required where those kinds contain multiple levels.
+
+Unknown cells remain NoData. A result without a calibrated uncertainty budget
+can carry a slope estimate but its threshold status is `uncertainty_unknown`.
+All estimates remain `not_field_validated` until evidence is reviewed; a successful
+software run does not certify a route's accessibility.

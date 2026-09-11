@@ -261,101 +261,27 @@ class OpenSfMRunner:
         raise OpenSfMUnavailable(f"OpenSfM produced no reconstruction.json under {dataset_dir}")
 
     # ------------------------------------------------------------------
-    def _load_fixture(
-        self,
-        fixture_path: Path,
-        sequences: Mapping[str, Iterable[FrameMeta]],
-    ) -> Dict[str, ReconstructionResult]:
-        if not fixture_path.exists():
-            raise FileNotFoundError(f"OpenSfM fixture not found: {fixture_path}")
-
-        payload = json.loads(fixture_path.read_text(encoding="utf8"))
-        if not isinstance(payload, list) or not payload:
-            raise ValueError("Invalid OpenSfM fixture: expected non-empty list")
-
-        reconstruction = payload[0]
-        shots = reconstruction.get("shots") or {}
-        cameras = reconstruction.get("cameras") or {}
-        points_block = reconstruction.get("points") or {}
-
-        frames_by_id: Dict[str, FrameMeta] = {}
+    def _load_fixture(self, fixture_path: Path, sequences: Mapping[str, Iterable[FrameMeta]]) -> Dict[str, ReconstructionResult]:
+        # Use the same native reader as the production slope pipeline. Raw SfM
+        # axes must not be relabeled ENU or interpreted as a vertical reference.
+        from slope_from_mapillary.reconstruction import load_opensfm
+        tracks = fixture_path.with_name("tracks.csv")
+        model = load_opensfm(fixture_path, tracks if tracks.exists() else None)
+        results = {}
         for seq_id, frames in sequences.items():
-            for frame in frames:
-                frames_by_id[frame.image_id] = frame
-
-        results: Dict[str, ReconstructionResult] = {}
-        per_sequence_frames: Dict[str, list[FrameMeta]] = {}
-        per_sequence_poses: Dict[str, Dict[str, Pose]] = {}
-
-        for image_filename, shot in shots.items():
-            image_id = image_filename.rsplit('.', 1)[0] if '.' in image_filename else image_filename
-            frame = frames_by_id.get(image_id)
-            if frame is None:
-                log.debug("Fixture shot %s not found in sequences; skipping", image_filename)
+            selected = [(frame, next((name for name in model.shots
+                                      if Path(name).stem == frame.image_id), None)) for frame in frames]
+            selected = [(frame, name) for frame, name in selected if name is not None]
+            if not selected:
                 continue
-
-            seq_id = frame.seq_id
-            rotation = shot.get("rotation") or shot.get("quaternion") or [1.0, 0.0, 0.0, 0.0]
-            translation = shot.get("translation") or [0.0, 0.0, 0.0]
-            if len(translation) != 3:
-                raise ValueError(f"Shot {image_id} translation must provide 3 values")
-            if len(rotation) == 4:
-                R = _quat_to_matrix(rotation)
-                pose_t = np.asarray(translation, dtype=np.float64)
-            elif len(rotation) == 3:
-                R_cw = _rodrigues_to_matrix(rotation)
-                R = R_cw.T
-                pose_t = -R @ np.asarray(translation, dtype=np.float64)
-            else:
-                raise ValueError(f"Shot {image_id} rotation must provide 3 or 4 values")
-            pose = Pose(R=R, t=pose_t)
-
-            camera_ref = shot.get("camera")
-            if camera_ref and camera_ref in cameras:
-                cam_info = cameras[camera_ref]
-                updated_params = frame.cam_params.copy()
-                for key, value in cam_info.items():
-                    if key in {"projection_type", "focal", "k1", "k2", "k3", "p1", "p2"} or key.startswith("principal"):
-                        updated_params[key] = value
-                frame = FrameMeta(
-                    image_id=frame.image_id,
-                    seq_id=frame.seq_id,
-                    captured_at_ms=frame.captured_at_ms,
-                    lon=frame.lon,
-                    lat=frame.lat,
-                    alt_ellip=frame.alt_ellip,
-                    camera_type=cam_info.get("projection_type", frame.camera_type),
-                    cam_params=updated_params,
-                    quality_score=frame.quality_score,
-                    thumbnail_url=frame.thumbnail_url,
-                )
-
-            per_sequence_frames.setdefault(seq_id, []).append(frame)
-            pose_map = per_sequence_poses.setdefault(seq_id, {})
-            pose_map[image_id] = pose
-
-        points_xyz = []
-        for point in points_block.values():
-            coordinates = point.get("coordinates")
-            if isinstance(coordinates, (list, tuple)) and len(coordinates) == 3:
-                points_xyz.append([float(coordinates[0]), float(coordinates[1]), float(coordinates[2])])
-
-        points_array = (
-            np.asarray(points_xyz, dtype=np.float32) if points_xyz else np.zeros((0, 3), dtype=np.float32)
-        )
-
-        for seq_id, frames in per_sequence_frames.items():
-            frames_sorted = sorted(frames, key=lambda f: f.captured_at_ms)
-            poses = per_sequence_poses.get(seq_id, {})
-            results[seq_id] = ReconstructionResult(
-                seq_id=seq_id,
-                frames=frames_sorted,
-                poses=poses,
-                points_xyz=points_array,
-                source="opensfm",
-                metadata={"fixture": str(fixture_path), "coordinate_frame": "enu", "source_type": "fixture"},
-            )
-
+            names = {name for _, name in selected}
+            poses = {frame.image_id: Pose(model.shots[name].rotation_cw.T, model.shots[name].center)
+                     for frame, name in selected}
+            xyz = np.asarray([point.xyz for point in model.points.values()
+                              if names.intersection(point.observations)], dtype=float).reshape(-1, 3)
+            results[seq_id] = ReconstructionResult(seq_id, [frame for frame, _ in selected], poses,
+                xyz, "opensfm", metadata={"reconstruction_path": str(fixture_path),
+                "coordinate_frame": "reconstruction", "source_type": "cached_reconstruction"})
         return results
 
 

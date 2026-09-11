@@ -1,0 +1,7 @@
+# Optional repository-local Mapillary acquisition and SfM/DIM integrations.
+# OpenSfM/COLMAP executables are installed separately for your platform.
+requests
+tqdm
+mercantile
+mapbox_vector_tile
+

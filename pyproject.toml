@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slope-from-mapillary"
+version = "0.1.0"
+description = "Observed surface slope models for pedestrian accessibility"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10", "pyproj>=3.5", "rasterio>=1.3", "Pillow>=9"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.3"]
+segmentation = ["torch>=2.5", "torchvision>=0.20", "transformers>=4.45", "safetensors"]
+
+[project.scripts]
+mapillary-slope = "slope_from_mapillary.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["slope_from_mapillary*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/slope"]
+
+[tool.ruff]
+line-length = 100
